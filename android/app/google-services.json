@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "834592686206",
+    "project_id": "tidar-property-c88ae",
+    "storage_bucket": "tidar-property-c88ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:834592686206:android:279e4d6b31b4011a34d82f",
+        "android_client_info": {
+          "package_name": "com.example.tidar_property"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD2oYgXrTT7LgjfZEgCMQYVFpHX_cJFQi4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
