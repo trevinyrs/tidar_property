@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:async'; // Tambahkan ini
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import '../../models/user_model.dart';
 import '../services/auth_service.dart';
 
@@ -48,12 +50,14 @@ class UserProvider with ChangeNotifier {
     }
   }
 
-  /// Register
   Future<bool> register({
     required String name,
     required String email,
     required String password,
     required UserRole role,
+    required String phone,
+    Uint8List? profileImageBytes,
+    String? profileImageName,
   }) async {
     try {
       final user = await _authService.register(
@@ -61,6 +65,9 @@ class UserProvider with ChangeNotifier {
         email: email,
         password: password,
         role: role,
+        phone: phone,
+        profileImageBytes: profileImageBytes,
+        profileImageName: profileImageName,
       );
 
       // Tidak langsung set currentUser (supaya redirect ke login)
@@ -71,7 +78,7 @@ class UserProvider with ChangeNotifier {
       return false;
     } catch (e) {
       print("Register Error: $e");
-      return false;
+      rethrow;
     }
   }
 
@@ -83,6 +90,31 @@ class UserProvider with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       print("Logout Error: $e");
+    }
+  }
+
+  /// Update Profile
+  Future<bool> updateUserProfile({
+    required String name,
+    required String phone,
+  }) async {
+    if (_currentUser == null) return false;
+    try {
+      await _authService.updateUserProfile(
+        uid: _currentUser!.idUser,
+        name: name,
+        phone: phone,
+      );
+      // Refresh current user data
+      final updatedUser = await _authService.getUserData(_currentUser!.idUser);
+      if (updatedUser != null) {
+        _currentUser = updatedUser;
+        notifyListeners();
+      }
+      return true;
+    } catch (e) {
+      print("Update User Profile Error: $e");
+      return false;
     }
   }
 

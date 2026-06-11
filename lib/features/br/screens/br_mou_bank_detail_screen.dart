@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../widgets/custom_app_bar.dart';
 
 class BrMouBankDetailScreen extends StatelessWidget {
   final String bankName;
@@ -9,93 +10,60 @@ class BrMouBankDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: null,
+      appBar: const CustomAppBar(
+        titleText: "",
+        backgroundColor: Colors.transparent,
+      ),
+      extendBodyBehindAppBar: true,
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.fromLTRB(16, 50, 16, 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () => Navigator.pop(context),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF3F4F6),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: const Icon(
-                            Icons.arrow_back_ios_new,
-                            size: 18,
-                            color: Color(0xFF374151),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      Image.asset("assets/images/logo_tidar.png", height: 35),
-                    ],
-                  ),
-
-                  const Icon(
-                    Icons.notifications_none,
-                    color: Color(0xFF374151),
-                  ),
-                ],
-              ),
-            ),
+            const SizedBox(height: kToolbarHeight + 40),
             // Header Info
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "ID KASUS : #TOR-77421",
-                    style: TextStyle(color: Colors.grey, fontSize: 11),
+                    "ID KASUS: #TDR-77421",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
-
                   const SizedBox(height: 8),
-
                   Text(
                     "Kemitraan Bank\n$bankName",
                     style: const TextStyle(
-                      fontSize: 34,
+                      fontSize: 32,
                       height: 1.1,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF263238),
+                      color: Color(0xFF1E293B),
                     ),
                   ),
-
-                  const SizedBox(height: 12),
-
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Container(
                         width: 8,
                         height: 8,
                         decoration: const BoxDecoration(
-                          color: Color(0xFF0284C7),
+                          color: Color(0xFF1F658A),
                           shape: BoxShape.circle,
                         ),
                       ),
-
                       const SizedBox(width: 8),
-
                       const Text(
                         "Saat ini dalam Tinjauan Hukum",
                         style: TextStyle(
-                          color: Color(0xFF0284C7),
-                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF1F658A),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                         ),
                       ),
                     ],
@@ -103,64 +71,96 @@ class BrMouBankDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 24),
+
+            // Timeline Card
             Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(20),
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  )
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Center(
-                    child: Text(
-                      "Siklus Hidup Perjanjian",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
+                  const Text(
+                    "Siklus Hidup Perjanjian",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Color(0xFF1E293B),
                     ),
                   ),
-
                   const SizedBox(height: 24),
 
                   _buildTimelineStep(
-                    "Draft",
-                    "12 Okt 2023",
-                    "Langkah perjanjian awal dan ketentuan diletakkan oleh pimpinan proyek.",
-                    true,
+                    title: "Draf",
+                    date: "12 Okt 2023",
+                    description: "Lingkup perjanjian awal dan ketentuan ditetapkan oleh pimpinan proyek.",
+                    status: TimelineStatus.completed,
+                    icon: Icons.check,
                   ),
                   _buildTimelineStep(
-                    "Tinjauan Hukum",
-                    "18 Okt 2023",
-                    "Tim hukum internal sedang meninjau klausul 4.2 dan 5.7 terkait kewajiban.",
-                    true,
-                    isActive: true,
+                    title: "Tinjauan Hukum",
+                    description: "Tim hukum internal sedang meninjau klausul 4.2 dan 5.7 terkait kewajiban.",
+                    status: TimelineStatus.active,
+                    icon: Icons.gavel,
+                    badgeText: "SEDANG BERJALAN",
+                    subtitleWidget: Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Row(
+                        children: [
+                          const CircleAvatar(
+                            radius: 10,
+                            backgroundImage: NetworkImage('https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=120'),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              "Ditugaskan ke Sarah Jenkins (Penasihat Hukum)",
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade600,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                   _buildTimelineStep(
-                    "Revisi",
-                    "",
-                    "Implementasi usulan bank terhadap perubahan bank mitra.",
-                    false,
+                    title: "Revisi",
+                    description: "Implementasi umpan balik hukum dan penawaran balik mitra.",
+                    status: TimelineStatus.pending,
+                    icon: Icons.history,
                   ),
                   _buildTimelineStep(
-                    "Persetujuan",
-                    "",
-                    "Persetujuan akhir dari Dewan Eksekutif dan Direktur Bank.",
-                    false,
+                    title: "Persetujuan",
+                    description: "Persetujuan akhir dari Dewan Eksekutif dan Direktur Bank.",
+                    status: TimelineStatus.pending,
+                    icon: Icons.assignment_turned_in_outlined,
                   ),
                   _buildTimelineStep(
-                    "Aktif",
-                    "",
-                    "Perjanjian berlaku di semua cabang regional.",
-                    false,
+                    title: "Aktif",
+                    description: "Perjanjian berlaku di semua cabang regional.",
+                    status: TimelineStatus.pending,
+                    icon: Icons.rocket_launch_outlined,
                   ),
                   _buildTimelineStep(
-                    "Kadaluwarsa",
-                    "Okt 2025",
-                    "Diperpanjang untuk evaluasi keberlanjutan pada Okt 2025.",
-                    false,
+                    title: "Kadaluarsa",
+                    description: "Dijadwalkan untuk evaluasi perpanjangan pada Okt 2025.",
+                    status: TimelineStatus.pending,
+                    icon: Icons.update_disabled_outlined,
+                    isLast: true,
                   ),
                 ],
               ),
@@ -170,27 +170,55 @@ class BrMouBankDetailScreen extends StatelessWidget {
 
             // Ringkasan Status Saat Ini
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(20),
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF0F4C81), Color(0xFF083B66)],
+                  colors: [Color(0xFF1F658A), Color(0xFF154863)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1F658A).withOpacity(0.2),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  )
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Ringkasan Status Saat Ini",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Icon(
+                        Icons.account_balance,
+                        color: Colors.white.withOpacity(0.3),
+                        size: 24,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
                   const Text(
-                    "Ringkasan Status Saat Ini",
+                    "INSTITUSI MITRA",
                     style: TextStyle(
-                      color: Colors.white,
+                      color: Colors.white60,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
                     ),
                   ),
-
-                  const SizedBox(height: 16),
-
+                  const SizedBox(height: 4),
                   Text(
                     "$bankName (Persero) Tbk.",
                     style: const TextStyle(
@@ -199,11 +227,12 @@ class BrMouBankDetailScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
-                  const Divider(color: Colors.white24),
-
-                  const SizedBox(height: 10),
-
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 1,
+                    color: Colors.white24,
+                  ),
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       Expanded(
@@ -213,7 +242,7 @@ class BrMouBankDetailScreen extends StatelessWidget {
                         child: _buildInfoItem(
                           "PRIORITAS",
                           "Kritis",
-                          color: Colors.redAccent,
+                          color: const Color(0xFFFF8A80),
                         ),
                       ),
                     ],
@@ -221,62 +250,139 @@ class BrMouBankDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 100),
+            const SizedBox(height: 48),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTimelineStep(
-    String title,
-    String date,
-    String description,
-    bool isCompleted, {
-    bool isActive = false,
+  Widget _buildTimelineStep({
+    required String title,
+    required String description,
+    required TimelineStatus status,
+    required IconData icon,
+    String? date,
+    String? badgeText,
+    Widget? subtitleWidget,
+    bool isLast = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    Color iconBgColor;
+    Color iconColor;
+    Color titleColor;
+    bool showLine = !isLast;
+
+    switch (status) {
+      case TimelineStatus.completed:
+        iconBgColor = const Color(0xFF1F658A);
+        iconColor = Colors.white;
+        titleColor = const Color(0xFF1E293B);
+        break;
+      case TimelineStatus.active:
+        iconBgColor = const Color(0xFFE3F2FD);
+        iconColor = const Color(0xFF1F658A);
+        titleColor = const Color(0xFF1F658A);
+        break;
+      case TimelineStatus.pending:
+      default:
+        iconBgColor = const Color(0xFFF1F5F9);
+        iconColor = Colors.grey.shade400;
+        titleColor = Colors.grey.shade500;
+        break;
+    }
+
+    return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Timeline indicator & line
           Column(
             children: [
               Container(
-                width: 24,
-                height: 24,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
+                  color: iconBgColor,
                   shape: BoxShape.circle,
-                  color: isCompleted
-                      ? Colors.green
-                      : (isActive ? Colors.blue : Colors.grey[300]),
+                  border: status == TimelineStatus.active
+                      ? Border.all(color: const Color(0xFF1F658A).withOpacity(0.5), width: 2)
+                      : null,
                 ),
-                child: isCompleted
-                    ? const Icon(Icons.check, color: Colors.white, size: 16)
-                    : null,
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 18,
+                ),
               ),
+              if (showLine)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    color: status == TimelineStatus.completed
+                        ? const Color(0xFF1F658A)
+                        : Colors.grey.shade200,
+                  ),
+                ),
             ],
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
+          // Content
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (date.isNotEmpty)
-                  Text(
-                    date,
-                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: titleColor,
+                          ),
+                        ),
+                      ),
+                      if (date != null)
+                        Text(
+                          date,
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (badgeText != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF96D3FD).withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: const TextStyle(
+                              color: Color(0xFF1F658A),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                const SizedBox(height: 4),
-                Text(
-                  description,
-                  style: const TextStyle(fontSize: 14, height: 1.4),
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: status == TimelineStatus.pending ? Colors.grey.shade400 : Colors.grey.shade600,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (subtitleWidget != null) subtitleWidget,
+                ],
+              ),
             ),
           ),
         ],
@@ -290,11 +396,13 @@ class BrMouBankDetailScreen extends StatelessWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.white70),
+          style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500),
         ),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
+            fontSize: 16,
             fontWeight: FontWeight.bold,
             color: color ?? Colors.white,
           ),
@@ -304,64 +412,8 @@ class BrMouBankDetailScreen extends StatelessWidget {
   }
 }
 
-Widget _buildModernTimeline({
-  required String title,
-  required String description,
-  required bool completed,
-  bool active = false,
-}) {
-  return IntrinsicHeight(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: completed
-                    ? const Color(0xFF0F766E)
-                    : active
-                    ? const Color(0xFF0284C7)
-                    : Colors.grey.shade300,
-              ),
-              child: Icon(
-                completed ? Icons.check : Icons.circle,
-                color: Colors.white,
-                size: 14,
-              ),
-            ),
-
-            Container(width: 2, height: 80, color: Colors.grey.shade300),
-          ],
-        ),
-
-        const SizedBox(width: 14),
-
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: active ? const Color(0xFF0284C7) : Colors.black,
-                ),
-              ),
-
-              const SizedBox(height: 4),
-
-              Text(
-                description,
-                style: TextStyle(color: Colors.grey.shade600, height: 1.5),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
+enum TimelineStatus {
+  completed,
+  active,
+  pending,
 }

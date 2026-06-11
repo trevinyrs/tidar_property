@@ -1,233 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../../core/providers/user_provider.dart';
+import '../../../core/providers/favorite_provider.dart';
 import '../../../core/services/property_service.dart';
 import '../../../models/property_model.dart';
-import '../../../models/user_model.dart';
 import '../../../widgets/custom_app_bar.dart';
 import 'property_detail_screen.dart';
 
-class PropertyListScreen extends StatefulWidget {
-  const PropertyListScreen({super.key});
+class AgentFavoriteScreen extends StatefulWidget {
+  const AgentFavoriteScreen({super.key});
 
   @override
-  State<PropertyListScreen> createState() => _PropertyListScreenState();
+  State<AgentFavoriteScreen> createState() => _AgentFavoriteScreenState();
 }
 
-class _PropertyListScreenState extends State<PropertyListScreen> {
+class _AgentFavoriteScreenState extends State<AgentFavoriteScreen> {
   final PropertyService _propertyService = PropertyService();
-
-  String _searchQuery = "";
-  String _selectedFilter = "Semua";
-
-  final List<Map<String, String>> _filterOptions = [
-    {"value": "Semua", "label": "All Properties"},
-    {"value": "rumah", "label": "Rumah"},
-    {"value": "rumah kos", "label": "Rumah Kos"},
-    {"value": "tanah", "label": "Tanah"},
-  ];
 
   @override
   Widget build(BuildContext context) {
+    final favoriteProvider = Provider.of<FavoriteProvider>(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
-      appBar: CustomAppBar(
-        titleWidget: Image.asset(
-          "assets/images/logo_tidar.png",
-          height: 38,
-          errorBuilder: (context, error, stackTrace) => const Text(
-            "TIMPRO",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F658A),
-            ),
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              // Search action
-            },
-            icon: const Icon(
-              Icons.search,
-              size: 26,
-              color: Color(0xFF1C2D37),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 40,
-            height: 40,
-            margin: const EdgeInsets.only(right: 20),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1C2D37),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.notifications_none_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
-        ],
+      appBar: const CustomAppBar(
+        titleText: "Listing Favorit Saya",
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // HERO SECTION
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      body: favoriteProvider.favoriteIds.isEmpty
+          ? Center(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    "Discover Spaces.",
+                  Icon(
+                    Icons.favorite_border_rounded,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Belum Ada Listing Favorit",
                     style: TextStyle(
-                      fontSize: 32,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1C2D37),
-                      height: 1.1,
-                      letterSpacing: -0.5,
+                      color: Colors.grey[700],
                     ),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "Curated properties for discerning lifestyles.",
+                    "Ketuk ikon favorit pada properti untuk menyimpannya.",
                     style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                      height: 1.3,
+                      fontSize: 13,
+                      color: Colors.grey[500],
                     ),
                   ),
                 ],
               ),
-            ),
+            )
+          : StreamBuilder<List<Property>>(
+              stream: _propertyService.getProperties(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-            const SizedBox(height: 12),
-
-            // FILTER CHIPS (Horizontal scrolling)
-            SizedBox(
-              height: 44,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _filterOptions.length,
-                itemBuilder: (context, index) {
-                  final filter = _filterOptions[index];
-                  final isSelected = _selectedFilter == filter["value"];
-
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedFilter = filter["value"]!;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? const Color(0xFF1F658A)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: isSelected
-                                ? Colors.transparent
-                                : Colors.grey.shade200,
-                          ),
-                          boxShadow: [
-                            if (!isSelected)
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.02),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              )
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            filter["label"]!,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.grey[700],
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      "Error: ${snapshot.error}",
+                      style: const TextStyle(color: Colors.red),
                     ),
                   );
-                },
-              ),
-            ),
+                }
 
-            const SizedBox(height: 20),
+                final allProperties = snapshot.data ?? [];
+                // Filter only favorited properties
+                final favoritedProperties = allProperties
+                    .where((p) => favoriteProvider.isFavorite(p.idProperti))
+                    .toList();
 
-            // PROPERTY STREAM LIST
-            Expanded(
-              child: StreamBuilder<List<Property>>(
-                stream: _propertyService.getProperties(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF1F658A),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return Center(child: Text("Error: ${snapshot.error}"));
-                  }
-
-                  var properties = snapshot.data ?? [];
-
-                  if (_selectedFilter != "Semua") {
-                    properties = properties
-                        .where(
-                          (p) =>
-                              p.type.toLowerCase() ==
-                              _selectedFilter.toLowerCase(),
-                        )
-                        .toList();
-                  }
-
-                  if (properties.isEmpty) {
-                    return Center(
-                      child: Text(
-                        "Tidak ada properti ditemukan",
-                        style: TextStyle(color: Colors.grey[500]),
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: properties.length,
-                    itemBuilder: (context, index) {
-                      return _buildMockupPropertyCard(
-                        context,
-                        properties[index],
-                      );
-                    },
+                if (favoritedProperties.isEmpty) {
+                  return Center(
+                    child: Text(
+                      "Tidak ada properti favorit aktif",
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
                   );
-                },
-              ),
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(20),
+                  itemCount: favoritedProperties.length,
+                  itemBuilder: (context, index) {
+                    return _buildMockupPropertyCard(
+                      context,
+                      favoritedProperties[index],
+                    );
+                  },
+                );
+              },
             ),
-          ],
-        ),
-      ),
     );
   }
 
-  // Modern Card matched with the UI mockup image
   Widget _buildMockupPropertyCard(BuildContext context, Property property) {
     final isSold = property.status.toUpperCase() == "SOLD";
 
@@ -247,7 +120,6 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image Section with Status Badge Overlay
           Stack(
             children: [
               ClipRRect(
@@ -295,7 +167,6 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
             ],
           ),
 
-          // Content section
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -356,7 +227,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Attention-Grabbing Specifications Bar
+                // Specifications Bar
                 Row(
                   children: [
                     _buildMiniSpec(Icons.king_bed_outlined, "${property.bedrooms} KT"),
@@ -443,15 +314,13 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
     );
   }
 
-  // Dynamic solid button colors for AVAILABLE / BOOKING
   Color _getButtonColor(String status) {
     if (status.toUpperCase() == "BOOKING") {
-      return const Color(0xFFD97706); // Solid amber orange
+      return const Color(0xFFD97706);
     }
-    return const Color(0xFF1F658A); // Solid primary blue (default/AVAILABLE)
+    return const Color(0xFF1F658A);
   }
 
-  // Soft Badge Backgrounds matching design and mockup
   Color _getBadgeBgColor(String status) {
     switch (status.toUpperCase()) {
       case "AVAILABLE":
@@ -465,7 +334,6 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
     }
   }
 
-  // Soft Badge Text Colors matching design and mockup
   Color _getBadgeTextColor(String status) {
     switch (status.toUpperCase()) {
       case "AVAILABLE":

@@ -5,6 +5,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../../widgets/role_bottom_nav.dart';
 import 'property_list_screen.dart';
 import 'agent_profile_screen.dart';
+import 'agent_favorite_screen.dart';
 
 class AgentHomeScreen extends StatefulWidget {
   const AgentHomeScreen({super.key});
@@ -18,7 +19,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
 
   final List<Widget> _pages = [
     const PropertyListScreen(),           // Marketplace Utama
-    const Center(child: Text("📋 Listing Favorit Saya", style: TextStyle(fontSize: 24))),
+    const AgentFavoriteScreen(),          // Favorit
     const AgentProfileScreen(),
   ];
 

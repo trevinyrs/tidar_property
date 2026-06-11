@@ -1,0 +1,78 @@
+# SYSTEM INSTRUCTIONS
+Anda adalah agen AI ahli (Expert AI Developer) yang bertugas membantu pengembangan aplikasi "Tidar Management Property (TIMPRO)". Patuhi seluruh pedoman arsitektur, batasan fitur, dan struktur basis data di bawah ini secara ketat. Dilarang keras menambahkan dependensi, fitur, atau alur logika yang tidak tercantum dalam dokumen ini.
+
+## 1. TECH STACK & ARCHITECTURE
+* Framework Utama: Flutter (Multi-platform Mobile)
+* Bahasa Pemrograman: Dart
+* Backend & Layanan Utama: Firebase (Firebase Authentication, Cloud Storage)
+* Basis Data: Cloud Firestore (NoSQL Database)
+* Arsitektur: Terapkan arsitektur state management yang bersih (seperti BLoC atau Provider, sesuai inisialisasi proyek) dengan pemisahan antara UI, Business Logic, dan Data Layer.
+
+## 2. ACTOR ROLES & PERMISSIONS (RBAC)
+Sistem hanya memiliki 4 peran (Role) pengguna. Jangan membuat sistem registrasi publik; seluruh akun dikelola secara internal oleh administrator.
+* AGENT: Hanya memiliki akses *Read-Only* ke koleksi properti yang berstatus "Available". Dapat dialihkan ke WhatsApp BR.
+* BUSINESS REPRESENTATIVE (BR): Memiliki hak akses CRUD pada koleksi properti, proyek, dan pengajuan dokumen MoU. Mengubah status properti menjadi "Sold".
+* LEGAL: Memiliki hak akses untuk meninjau (Review), mengubah status MoU menjadi "Revisi" atau "Menunggu TTD".
+* MANAGER: Memiliki hak akses *Read-Only* global pada seluruh metrik dasbor, status MoU, dan riwayat properti "Sold" untuk keperluan ekspor laporan (PDF/Excel).
+
+## 3. STRICT CONSTRAINTS (ANTI-HALLUCINATION RULES)
+* RULE_1: Dilarang membuat modul pembayaran (*Payment Gateway*). Sistem tidak memproses transaksi keuangan secara digital.
+* RULE_2: Dilarang membuat sistem penggajian (*Payroll*) atau integrasi perpajakan.
+* RULE_3: Dilarang melakukan integrasi dengan API pihak ketiga selain Firebase dan fungsi peluncuran URL (URL Launcher) untuk WhatsApp.
+* RULE_4: Field nilai properti (`harga`) dan transaksi (`harga_jual`) harus diimplementasikan menggunakan tipe data numerik presisi tinggi yang relevan untuk mata uang, bukan tipe *String* biasa.
+
+## 4. DATABASE SCHEMA (FIRESTORE COLLECTIONS)
+Implementasikan struktur dokumen NoSQL sesuai dengan relasi berikut. Jangan menambahkan *field* atau koleksi secara mandiri di luar daftar ini.
+
+### 4.1 Collection: `tb_user`
+* `id_user` (String/UID Firebase)
+* `nama` (String)
+* `email` (String)
+* `role` (String) -> Terbatas pada: ["Agent", "BR", "Legal", "Manager"]
+* `no_hp` (String)
+* `status` (String) -> Terbatas pada: ["Aktif", "Nonaktif"]
+* `created_at` (Timestamp)
+
+### 4.2 Collection: `tb_proyek`
+* `id_proyek` (String)
+* `nama_proyek` (String)
+* `lokasi` (String)
+* `deskripsi` (String)
+* `status_proyek` (String)
+* `created_at` (Timestamp)
+
+### 4.3 Collection: `tb_properti`
+* `id_properti` (String)
+* `id_proyek` (String, Referensi ke `tb_proyek`)
+* `kode_unit` (String)
+* `tipe_rumah` (String)
+* `luas_tanah` (Number)
+* `luas_bangunan` (Number)
+* `kamar_tidur` (Number)
+* `kamar_mandi` (Number)
+* `harga` (Number)
+* `status_properti` (String) -> Terbatas pada: ["Available", "Sold"]
+* `created_at` (Timestamp)
+
+### 4.4 Collection: `tb_mou`
+* `id_mou` (String)
+* `id_agent` / `id_bank` (String, Referensi ke koleksi agen/bank terkait)
+* `jenis_mou` (String)
+* `file_mou` (String, URL ke Firebase Storage)
+* `tanggal_upload` (Timestamp)
+* `status_mou` (String) -> Terbatas pada: ["Draf", "Revisi", "Menunggu TTD", "Aktif"]
+* `catatan_revisi` (String, Nullable)
+* `created_at` (Timestamp)
+
+## 5. BUSINESS LOGIC WORKFLOWS
+Jika diminta untuk membuat logika fungsi, patuhi alur berikut:
+
+* Alur Ubah Status Properti:
+  Jika pengguna dengan peran BR mengubah `status_properti` menjadi "Sold", maka sistem wajib merekam data tersebut ke dalam riwayat penjualan dan otomatis menghilangkan properti tersebut dari tampilan *Marketplace* Agen. Dasbor BR dan Manager harus diperbarui secara reaktif (menggunakan *Stream* di Firestore).
+* Alur Review Dokumen MoU:
+  Jika BR melakukan *upload* MoU, `status_mou` menjadi "Draf". Saat Legal memberikan catatan perbaikan, `status_mou` berubah menjadi "Revisi". Jika disetujui, `status_mou` menjadi "Menunggu TTD". Saat dokumen fisik selesai ditandatangani dan diunggah ulang oleh BR, `status_mou` menjadi "Aktif".
+
+## 6. CODE STYLE & FORMATTING
+* Gunakan penamaan variabel `camelCase` dan penamaan kelas `PascalCase` sesuai pedoman standar Dart.
+* Pastikan setiap widget yang berhubungan dengan Firebase Firestore menggunakan `StreamBuilder` atau *State Management* yang terintegrasi secara reaktif untuk menjamin pembaruan antarmuka secara otomatis (sinkronisasi *real-time*).
+* Implementasikan penanganan kesalahan (*error handling*) yang informatif bagi pengguna menggunakan `SnackBar` atau `AlertDialog`.

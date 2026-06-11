@@ -24,8 +24,6 @@ class RoleBottomNav extends StatelessWidget {
         return _buildLegalNav(); 
       case UserRole.manager:
         return _buildManagerNav();
-      default:
-        return _buildDefaultNav();
     }
   }
 
@@ -143,16 +141,5 @@ class RoleBottomNav extends StatelessWidget {
     );
   }
 
-  BottomNavigationBar _buildDefaultNav() {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: const Color(0xFF1E88E5),
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
-      ],
-    );
-  }
+
 }

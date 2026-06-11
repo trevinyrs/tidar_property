@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tidar_property/features/legal/screens/legal_mou_review_screen.dart';
@@ -6,6 +5,8 @@ import 'package:tidar_property/features/legal/screens/legal_profile_screen.dart'
 import 'package:tidar_property/models/user_model.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../widgets/role_bottom_nav.dart';
+import '../../../core/services/mou_service.dart';
+import '../../../models/mou_model.dart';
 
 class LegalHomeScreen extends StatefulWidget {
   const LegalHomeScreen({super.key});
@@ -124,12 +125,14 @@ class LegalDashboardContent extends StatelessWidget {
             child: Row(
               children: [
                 _buildRealtimeStatCard(
+                  context,
                   "MENUNGGU",
-                  "Pending",
+                  "Draf",
                   Colors.blue,
                 ),
                 const SizedBox(width: 7),
                 _buildRealtimeStatCard(
+                  context,
                   "PERLU REVISI",
                   "Revisi",
                   Colors.orange,
@@ -156,18 +159,14 @@ class LegalDashboardContent extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('mou_documents')
-                .orderBy('createdAt', descending: true)
-                .limit(5)
-                .snapshots(),
+          StreamBuilder<List<MouDocument>>(
+            stream: Provider.of<MouService>(context, listen: false).getRecentMousStream(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.all(16),
                   child: Text(
@@ -177,12 +176,11 @@ class LegalDashboardContent extends StatelessWidget {
                 );
               }
 
-              final activities = snapshot.data!.docs;
+              final activities = snapshot.data!;
 
               return Column(
-                children: activities.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final docId = doc.id;
+                children: activities.map((mou) {
+                  final docId = mou.idMou;
 
                   return GestureDetector(
                     onTap: () {
@@ -195,9 +193,9 @@ class LegalDashboardContent extends StatelessWidget {
                       );
                     },
                     child: _buildActivityItem(
-                      data['title'] ?? "Dokumen Baru",
-                      data['bankName'] ?? data['uploadedBy'] ?? "BR",
-                      "Review",
+                      mou.title.isNotEmpty ? mou.title : mou.fileName,
+                      mou.jenisMou,
+                      mou.statusMou,
                       Colors.blue,
                     ),
                   );
@@ -434,15 +432,16 @@ class LegalDashboardContent extends StatelessWidget {
       ),
     );
   }
-  Widget _buildRealtimeStatCard(String title, String statusKeyword, Color color) {
+  Widget _buildRealtimeStatCard(BuildContext context, String title, String statusKeyword, Color color) {
+    final Stream<int> countStream = Provider.of<MouService>(context, listen: false).getMousStream().map((list) {
+      return list.where((mou) => mou.statusMou.toLowerCase() == statusKeyword.toLowerCase()).length;
+    });
+
     return Expanded(
-      child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('mou_documents')
-            .where('status', isEqualTo: statusKeyword)
-            .snapshots(),
+      child: StreamBuilder<int>(
+        stream: countStream,
         builder: (context, snapshot) {
-          final count = snapshot.data?.docs.length ?? 0;
+          final count = snapshot.data ?? 0;
 
           return Container(
             padding: const EdgeInsets.all(16),

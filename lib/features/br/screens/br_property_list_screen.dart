@@ -210,10 +210,11 @@ class _BrPropertyListScreenState extends State<BrPropertyListScreen> {
           ),
           TextButton(
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(context);
               bool success = await _propertyService.deleteProperty(property.id);
-              if (success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+              if (success) {
+                messenger.showSnackBar(
                   const SnackBar(content: Text("Properti berhasil dihapus"), backgroundColor: Colors.green),
                 );
               }

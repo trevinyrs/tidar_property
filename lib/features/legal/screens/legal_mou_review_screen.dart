@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import '../../../core/services/mou_service.dart';
+import '../../../models/mou_model.dart';
 
 class LegalMouReviewScreen extends StatelessWidget {
   final String documentId;
@@ -8,11 +10,14 @@ class LegalMouReviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('mou_documents')
-          .doc(documentId)
-          .snapshots(),
+    if (documentId.isEmpty) {
+      return const Scaffold(
+        body: Center(child: Text("ID Dokumen kosong")),
+      );
+    }
+
+    return StreamBuilder<MouDocument?>(
+      stream: Provider.of<MouService>(context, listen: false).getMouStream(documentId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -20,25 +25,24 @@ class LegalMouReviewScreen extends StatelessWidget {
           );
         }
 
-        if (!snapshot.hasData || !snapshot.data!.exists) {
+        final mou = snapshot.data;
+        if (mou == null) {
           return const Scaffold(
             body: Center(child: Text("Dokumen tidak ditemukan")),
           );
         }
 
-        final data = snapshot.data!.data() as Map<String, dynamic>;
-        final status = data['status'] ?? 'Pending';
-        final title = data['title'] ?? 'MoU - Global Strategic Bank';
-        final documentType = data['documentType'] ?? '';
+        final status = mou.statusMou;
+        final title = mou.title.isNotEmpty ? mou.title : mou.fileName;
 
-        final type = (data['type'] ?? '').toString().toLowerCase();
+        final type = mou.jenisMou.toLowerCase();
 
         String entityName = '-';
 
         if (type == 'agent') {
-          entityName = data['company'] ?? data['agentName'] ?? '-';
+          entityName = mou.idAgent ?? '-';
         } else {
-          entityName = data['bankName'] ?? '-';
+          entityName = mou.idBank ?? '-';
         }
 
         return Scaffold(

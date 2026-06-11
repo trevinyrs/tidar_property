@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
 import '../../../models/mou_model.dart';
 import 'br_mou_bank_detail_screen.dart';
+import '../../../core/services/mou_service.dart';
+import '../../../widgets/custom_app_bar.dart';
 
 class BrMouBankUploadScreen extends StatefulWidget {
   final String bankName;
@@ -14,7 +16,23 @@ class BrMouBankUploadScreen extends StatefulWidget {
 }
 
 class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final _bankNameController = TextEditingController();
+  String _selectedPriority = "Normal";
+  final _notesController = TextEditingController();
+  List<MouDocument> _tempUploadedFiles = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _bankNameController.text = widget.bankName;
+  }
+
+  @override
+  void dispose() {
+    _bankNameController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickAndUploadFile() async {
     try {
@@ -25,32 +43,36 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
       );
 
       if (result != null) {
-        for (var file in result.files) {
-          final mou = {
-            'title': file.name.split('.').first,
-            'fileName': file.name,
-            'fileSize': file.size != null
-                ? "${(file.size! / 1024 / 1024).toStringAsFixed(1)} MB"
-                : "Unknown",
-            'uploadedAt': DateTime.now().toString(),
-            'type': 'Bank',
-            'bankName': widget.bankName, // ← Simpan nama bank
-            'status': 'Pending',
-            'createdAt': FieldValue.serverTimestamp(),
-            'uploadedBy': "BR User",
-          };
+        setState(() {
+          for (var file in result.files) {
+            final mou = MouDocument(
+              idMou: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+              idBank: _bankNameController.text,
+              jenisMou: 'Bank',
+              fileMou: file.name,
+              tanggalUpload: DateTime.now(),
+              statusMou: 'Draf',
+              createdAt: DateTime.now(),
+              title: file.name.split('.').first,
+              fileName: file.name,
+              fileSize: file.size != null
+                  ? "${(file.size! / 1024 / 1024).toStringAsFixed(1)} MB"
+                  : "Unknown",
+            );
+            _tempUploadedFiles.add(mou);
+          }
+        });
 
-          await _firestore.collection('mou_documents').add(mou);
-        }
-
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("✅ Dokumen berhasil diunggah"),
+            content: Text("✅ Dokumen ditambahkan ke antrean"),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text("Gagal upload: $e"),
@@ -60,15 +82,53 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
     }
   }
 
-  Future<void> _deleteFile(String docId) async {
-    await _firestore.collection('mou_documents').doc(docId).delete();
+  Future<void> _deleteFile(int index) async {
+    setState(() {
+      _tempUploadedFiles.removeAt(index);
+    });
   }
 
   Future<void> _ajukanUntukTinjauan() async {
-    Navigator.push(
+    final mouService = Provider.of<MouService>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final bankName = _bankNameController.text.trim();
+
+    if (bankName.isEmpty) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text("Nama Bank wajib diisi"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    if (_tempUploadedFiles.isEmpty) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text("Wajib mengunggah minimal 1 dokumen MoU"), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Simpan semua temp files ke Firestore secara berurutan sesuai flowchart
+    for (var file in _tempUploadedFiles) {
+      final finalDoc = MouDocument(
+        idMou: '',
+        idBank: bankName,
+        jenisMou: 'Bank',
+        fileMou: file.fileName,
+        tanggalUpload: DateTime.now(),
+        statusMou: 'Draf', // Tahap pertama flowchart
+        createdAt: DateTime.now(),
+        title: file.title,
+        fileName: file.fileName,
+        fileSize: file.fileSize,
+      );
+      await mouService.addMou(finalDoc);
+    }
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => BrMouBankDetailScreen(bankName: widget.bankName),
+        builder: (_) => BrMouBankDetailScreen(bankName: bankName),
       ),
     );
   }
@@ -77,99 +137,108 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        title: Text("Unggah MoU - ${widget.bankName}"),
-        backgroundColor: Colors.white,
-        elevation: 0,
+      appBar: const CustomAppBar(
+        titleText: "Unggah Dokumen",
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Unggah MoU Bank ${widget.bankName}",
-              style: const TextStyle(fontSize: 16),
-            ),
             const Text(
               "Unggah Memorandum of Understanding (MoU) Anda dengan aman untuk tinjauan dokumen. Format yang didukung: PDF, DOCX.",
-              style: TextStyle(color: Colors.grey),
-            ),
-
-            const SizedBox(height: 24),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE3F2FD),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF90CAF9)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance,
-                      color: Color(0xFF1565C0),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Bank Mitra",
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.bankName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1565C0),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              style: TextStyle(color: Colors.grey, height: 1.5, fontSize: 13),
             ),
             const SizedBox(height: 24),
+
+            // Nama Bank Form Input
+            const Text(
+              "Nama Bank",
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _bankNameController,
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFFEDF1F4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                hintText: "Masukkan nama bank...",
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Prioritas Form Input
+            const Text(
+              "Prioritas",
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedPriority,
+              items: const [
+                DropdownMenuItem(value: "Normal", child: Text("Normal")),
+                DropdownMenuItem(value: "Urgent", child: Text("Urgent")),
+              ],
+              onChanged: (val) {
+                if (val != null) {
+                  setState(() {
+                    _selectedPriority = val;
+                  });
+                }
+              },
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFFEDF1F4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Area Picker File
             GestureDetector(
               onTap: _pickAndUploadFile,
               child: Container(
                 height: 180,
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.withOpacity(0.4)),
-                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade300, width: 2, style: BorderStyle.solid),
+                  borderRadius: BorderRadius.circular(24),
+                  color: Colors.white,
                 ),
-                child: const Center(
+                child: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        Icons.cloud_upload_outlined,
-                        size: 48,
-                        color: Color(0xFF1E88E5),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF96D3FD).withOpacity(0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.cloud_upload,
+                          size: 32,
+                          color: Color(0xFF1F658A),
+                        ),
                       ),
-                      SizedBox(height: 12),
-                      Text(
+                      const SizedBox(height: 12),
+                      const Text(
                         "Pilih file Anda di sini",
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
                       ),
+                      const SizedBox(height: 4),
                       Text(
-                        "atau tarik dan lepas dokumen",
-                        style: TextStyle(color: Colors.grey),
+                        "atau tarik dan lepas dokumen MoU Anda",
+                        style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
                       ),
                     ],
                   ),
@@ -178,114 +247,146 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
             ),
 
             const SizedBox(height: 24),
-            const Text(
-              "Dokumen Terunggah",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Dokumen Terunggah",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                ),
+                Text(
+                  "${_tempUploadedFiles.length} FILE",
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
 
-            StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('mou_documents')
-                  .where('type', isEqualTo: 'Bank')
-                  .where('status', isEqualTo: 'Pending')
-                  .orderBy('createdAt', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+            // List File Terunggah
+            _tempUploadedFiles.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text("Belum ada file dipilih", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  )
+                : Column(
+                    children: List.generate(_tempUploadedFiles.length, (index) {
+                      final file = _tempUploadedFiles[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 10)
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.picture_as_pdf, color: Colors.red.shade700, size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    file.fileName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "${file.fileSize} • Diunggah baru saja",
+                                    style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.remove_red_eye_outlined, color: Colors.grey, size: 20),
+                              onPressed: () {},
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                              onPressed: () => _deleteFile(index),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ),
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
+            const SizedBox(height: 16),
+
+            // Info Banner Pengiriman Aman
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDF1F4),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified_user_outlined, color: Color(0xFF1F658A), size: 22),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Text(
-                      "Belum ada dokumen terunggah",
-                      style: TextStyle(color: Colors.grey),
+                      "Pengiriman Aman\nDokumen Anda dienkripsi dan hanya dapat diakses oleh personel hukum yang berwenang.",
+                      style: TextStyle(color: Colors.grey.shade700, fontSize: 11, height: 1.4),
                     ),
-                  );
-                }
+                  ),
+                ],
+              ),
+            ),
 
-                final files = snapshot.data!.docs
-                    .map(
-                      (doc) => MouDocument.fromMap(
-                        doc.data() as Map<String, dynamic>,
-                        doc.id,
-                      ),
-                    )
-                    .toList();
+            const SizedBox(height: 20),
 
-                return Column(
-                  children: files
-                      .map((file) => _buildUploadedFile(file))
-                      .toList(),
-                );
-              },
+            // Catatan Text Area
+            TextField(
+              controller: _notesController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: "Tuliskan poin-poin revisi secara mendetail di sini. Contoh: 'Pasal 4 Ayat 2 mengenai masa tenggang pembayaran perlu disesuaikan dengan kebijakan terbaru...'",
+                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12, height: 1.5),
+                filled: true,
+                fillColor: const Color(0xFFEDF1F4),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.all(16),
+              ),
             ),
 
             const SizedBox(height: 24),
 
+            // Ajukan Button
             SizedBox(
               width: double.infinity,
-              height: 52,
-              child: ElevatedButton.icon(
+              height: 54,
+              child: ElevatedButton(
                 onPressed: _ajukanUntukTinjauan,
-                icon: const Icon(Icons.send),
-                label: const Text("Ajukan untuk Tinjauan"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E88E5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  backgroundColor: const Color(0xFF1F658A),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                  elevation: 0,
                 ),
+                child: const Text("Ajukan untuk Tinjauan", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
-
-            const SizedBox(height: 100),
+            const SizedBox(height: 60),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildUploadedFile(MouDocument file) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.picture_as_pdf, color: Colors.red, size: 32),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.fileName,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  "${file.fileSize} • ${file.uploadedAt}",
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            file.status,
-            style: const TextStyle(
-              color: Colors.orange,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => _deleteFile(file.id),
-          ),
-        ],
       ),
     );
   }
