@@ -116,6 +116,7 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
         fileMou: file.fileName,
         tanggalUpload: DateTime.now(),
         statusMou: 'Draf', // Tahap pertama flowchart
+        catatan: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
         createdAt: DateTime.now(),
         title: file.title,
         fileName: file.fileName,

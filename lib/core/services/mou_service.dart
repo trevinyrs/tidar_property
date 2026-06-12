@@ -117,4 +117,66 @@ class MouService {
       return false;
     }
   }
+
+  // Aksi A: Berikan Revisi (Menggunakan WriteBatch)
+  Future<bool> submitRevision({
+    required String idMou,
+    required String idUser,
+    required String catatan,
+  }) async {
+    try {
+      final WriteBatch batch = _db.batch();
+      
+      final DocumentReference mouRef = _db.collection('tb_mou').doc(idMou);
+      batch.update(mouRef, {
+        'status_mou': 'Revisi',
+        'catatan_revisi': catatan,
+      });
+
+      final DocumentReference reviewRef = _db.collection('tb_review_mou').doc();
+      batch.set(reviewRef, {
+        'id_mou': idMou,
+        'id_user': idUser,
+        'tanggal_review': Timestamp.now(),
+        'hasil_review': 'Revisi',
+        'catatan': catatan,
+      });
+
+      await batch.commit();
+      return true;
+    } catch (e) {
+      print("Error committing revision batch: $e");
+      return false;
+    }
+  }
+
+  // Aksi B: Setujui & Teruskan (Menggunakan WriteBatch)
+  Future<bool> approveAndForward({
+    required String idMou,
+    required String idUser,
+  }) async {
+    try {
+      final WriteBatch batch = _db.batch();
+
+      final DocumentReference mouRef = _db.collection('tb_mou').doc(idMou);
+      batch.update(mouRef, {
+        'status_mou': 'Menunggu TTD',
+      });
+
+      final DocumentReference reviewRef = _db.collection('tb_review_mou').doc();
+      batch.set(reviewRef, {
+        'id_mou': idMou,
+        'id_user': idUser,
+        'tanggal_review': Timestamp.now(),
+        'hasil_review': 'Disetujui',
+        'catatan': '-',
+      });
+
+      await batch.commit();
+      return true;
+    } catch (e) {
+      print("Error committing approval batch: $e");
+      return false;
+    }
+  }
 }

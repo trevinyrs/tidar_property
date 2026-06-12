@@ -48,16 +48,6 @@ class RoleBottomNav extends StatelessWidget {
           label: 'Dokumen',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.task_outlined),
-          activeIcon: Icon(Icons.task),
-          label: 'Tugas',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.settings_outlined),
-          activeIcon: Icon(Icons.settings),
-          label: 'Sistem',
-        ),
-        BottomNavigationBarItem(
           icon: Icon(Icons.person_outline),
           activeIcon: Icon(Icons.person),
           label: 'Profil',

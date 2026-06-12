@@ -53,7 +53,13 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _bathrooms = widget.property.bathrooms;
 
     _selectedType = widget.property.type.toLowerCase();
-    _selectedStatus = widget.property.status.toUpperCase();
+    
+    final statusString = widget.property.status.toLowerCase();
+    if (statusString == 'sold') {
+      _selectedStatus = 'Sold';
+    } else {
+      _selectedStatus = 'Available';
+    }
 
     _latitude = widget.property.latitude;
     _longitude = widget.property.longitude;
@@ -576,6 +582,19 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                               DropdownMenuItem(value: "tanah", child: Text("Tanah")),
                             ],
                             onChanged: (value) => setState(() => _selectedType = value!),
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          _buildInputLabel("STATUS PROPERTI"),
+                          DropdownButtonFormField<String>(
+                            value: _selectedStatus,
+                            decoration: _buildInputDecoration("Pilih Status"),
+                            items: const [
+                              DropdownMenuItem(value: "Available", child: Text("Available")),
+                              DropdownMenuItem(value: "Sold", child: Text("Sold")),
+                            ],
+                            onChanged: (value) => setState(() => _selectedStatus = value!),
                           ),
                         ],
                       ),

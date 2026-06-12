@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class MouDocument {
   final String idMou;
@@ -6,9 +7,11 @@ class MouDocument {
   final String? idBank;
   final String jenisMou;
   final String fileMou;
+  final String? fileMouFinal;
   final DateTime tanggalUpload;
   final String statusMou; // Terbatas pada: ["Draf", "Revisi", "Menunggu TTD", "Aktif"]
   final String? catatanRevisi;
+  final String? catatan;
   final DateTime createdAt;
 
   // Properti tambahan untuk kompatibilitas UI lama (jika ada)
@@ -22,9 +25,11 @@ class MouDocument {
     this.idBank,
     required this.jenisMou,
     required this.fileMou,
+    this.fileMouFinal,
     required this.tanggalUpload,
     required this.statusMou,
     this.catatanRevisi,
+    this.catatan,
     required this.createdAt,
     
     // Opsional untuk kompatibilitas
@@ -32,6 +37,24 @@ class MouDocument {
     this.fileName = '',
     this.fileSize = '',
   });
+
+  static DateTime _parseTanggalUpload(dynamic val) {
+    if (val == null) return DateTime.now();
+    if (val is Timestamp) return val.toDate();
+    if (val is DateTime) return val;
+    if (val is String) {
+      try {
+        return DateFormat("d MMM yyyy").parse(val);
+      } catch (_) {
+        try {
+          return DateTime.parse(val);
+        } catch (_) {
+          return DateTime.now();
+        }
+      }
+    }
+    return DateTime.now();
+  }
 
   factory MouDocument.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
@@ -41,9 +64,11 @@ class MouDocument {
       idBank: data['id_bank'],
       jenisMou: data['jenis_mou'] ?? data['type'] ?? 'Bank',
       fileMou: data['file_mou'] ?? data['fileName'] ?? '',
-      tanggalUpload: (data['tanggal_upload'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      fileMouFinal: data['file_mou_final'],
+      tanggalUpload: _parseTanggalUpload(data['tanggal_upload']),
       statusMou: data['status_mou'] ?? data['status'] ?? 'Draf',
       catatanRevisi: data['catatan_revisi'],
+      catatan: data['catatan'],
       createdAt: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
       
       title: data['title'] ?? data['fileName'] ?? '',
@@ -58,9 +83,11 @@ class MouDocument {
       'id_bank': idBank,
       'jenis_mou': jenisMou,
       'file_mou': fileMou,
+      'file_mou_final': fileMouFinal,
       'tanggal_upload': Timestamp.fromDate(tanggalUpload),
       'status_mou': statusMou,
       'catatan_revisi': catatanRevisi,
+      'catatan': catatan,
       'created_at': Timestamp.fromDate(createdAt),
       
       'title': title,
@@ -71,24 +98,17 @@ class MouDocument {
 
   // Kompatibilitas dari fromMap & toMap
   factory MouDocument.fromMap(Map<String, dynamic> map, String id) {
-    DateTime parsedUpload;
-    if (map['tanggal_upload'] is Timestamp) {
-      parsedUpload = (map['tanggal_upload'] as Timestamp).toDate();
-    } else if (map['uploadedAt'] is String) {
-      parsedUpload = DateTime.tryParse(map['uploadedAt']) ?? DateTime.now();
-    } else {
-      parsedUpload = DateTime.now();
-    }
-
     return MouDocument(
       idMou: id,
       idAgent: map['id_agent'],
       idBank: map['id_bank'],
       jenisMou: map['jenis_mou'] ?? map['type'] ?? 'Bank',
       fileMou: map['file_mou'] ?? map['fileName'] ?? '',
-      tanggalUpload: parsedUpload,
+      fileMouFinal: map['file_mou_final'],
+      tanggalUpload: _parseTanggalUpload(map['tanggal_upload'] ?? map['uploadedAt']),
       statusMou: map['status_mou'] ?? map['status'] ?? 'Draf',
       catatanRevisi: map['catatan_revisi'],
+      catatan: map['catatan'],
       createdAt: (map['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
       
       title: map['title'] ?? map['fileName'] ?? '',

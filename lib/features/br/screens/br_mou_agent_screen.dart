@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'br_mou_agent_upload_screen.dart';
+import 'mou_tracking_detail_screen.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../models/user_model.dart';
+import '../../../models/mou_model.dart';
 import '../../../widgets/custom_app_bar.dart';
 
 class BrMouAgentScreen extends StatefulWidget {
@@ -211,10 +213,25 @@ class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: GestureDetector(
         onTap: () {
+          final mockMou = MouDocument(
+            idMou: 'mock_mou_${name.replaceAll(' ', '_')}',
+            idAgent: name,
+            jenisMou: 'Agent',
+            fileMou: 'MoU_Kemitraan_Agent.pdf',
+            tanggalUpload: DateTime.now().subtract(const Duration(days: 1)),
+            statusMou: status == 'PROSES' ? 'Revisi' : (status == 'AKTIF' ? 'Aktif' : 'Draf'),
+            catatanRevisi: status == 'PROSES' ? 'Mohon perhatikan pasal 4 ayat 2 mengenai terminasi dini.' : null,
+            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+            title: 'MoU_Kemitraan_Agent',
+            fileName: 'MoU_Kemitraan_Agent.pdf',
+            fileSize: '2.4 MB',
+          );
+
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => BrMouAgentUploadScreen(
+              builder: (_) => MouTrackingDetailScreen(
+                mou: mockMou,
                 agentName: name,
                 company: company,
               ),
