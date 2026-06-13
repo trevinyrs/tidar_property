@@ -11,7 +11,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/services/property_service.dart';
 import '../../../core/services/mou_service.dart';
 import '../../../models/mou_model.dart';
-
+import '../../../models/property_model.dart';
 class BrHomeScreen extends StatefulWidget {
   const BrHomeScreen({super.key});
 
@@ -22,12 +22,22 @@ class BrHomeScreen extends StatefulWidget {
 class _BrHomeScreenState extends State<BrHomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    const BrDashboardContent(),
-    const BrMouScreen(),
-    const BrStockScreen(),
-    const BrProfileScreen(),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      BrDashboardContent(onNavigateToMou: () {
+        setState(() {
+          _currentIndex = 1; // Index untuk BrMouScreen
+        });
+      }),
+      const BrMouScreen(),
+      const BrStockScreen(),
+      const BrProfileScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +54,9 @@ class _BrHomeScreenState extends State<BrHomeScreen> {
 
 // ================== DASHBOARD CONTENT ==================
 class BrDashboardContent extends StatelessWidget {
-  const BrDashboardContent({super.key});
+  final VoidCallback onNavigateToMou;
+
+  const BrDashboardContent({super.key, required this.onNavigateToMou});
 
   @override
   Widget build(BuildContext context) {
@@ -299,7 +311,7 @@ class BrDashboardContent extends StatelessWidget {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
                 ),
                 GestureDetector(
-                  onTap: () {},
+                  onTap: onNavigateToMou,
                   child: const Text(
                     "Lihat Semua",
                     style: TextStyle(color: Color(0xFF1F658A), fontWeight: FontWeight.bold, fontSize: 14),
@@ -351,15 +363,15 @@ class BrDashboardContent extends StatelessWidget {
 
   // Widget untuk mengambil jumlah agent secara realtime
   Widget _buildAgentCountStream(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    return StreamBuilder<List<AppUser>>(
-      stream: authService.getUsersStream(roleFilter: 'Agent'),
+    final mouService = Provider.of<MouService>(context, listen: false);
+    return StreamBuilder<List<MouDocument>>(
+      stream: mouService.getMousByTypeStream('Agent'),
       builder: (context, snapshot) {
-        final agents = snapshot.data ?? [];
-        final count = agents.length;
+        final mous = snapshot.data ?? [];
+        final count = mous.where((m) => m.statusMou.toUpperCase() == 'AKTIF').length;
 
         return Text(
-          count > 0 ? "$count" : "124",
+          count > 0 ? "$count" : "0",
           style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black87),
         );
       },
@@ -369,10 +381,11 @@ class BrDashboardContent extends StatelessWidget {
   // Widget untuk mengambil jumlah properti secara realtime dan merender Card Biru Primary
   Widget _buildPropertyCard(BuildContext context) {
     final propertyService = Provider.of<PropertyService>(context, listen: false);
-    return StreamBuilder<List<dynamic>>(
+    return StreamBuilder<List<Property>>(
       stream: propertyService.getProperties(),
       builder: (context, snapshot) {
-        final count = snapshot.data?.length ?? 856;
+        final properties = snapshot.data ?? [];
+        final count = properties.where((p) => p.status.toUpperCase() == 'AVAILABLE').length;
 
         return Container(
           width: double.infinity,
@@ -424,19 +437,6 @@ class BrDashboardContent extends StatelessWidget {
               const Text(
                 "Listing Aktif",
                 style: TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              const Divider(color: Colors.white24, height: 1),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "${count > 10 ? (count * 0.037).floor() : 32} Baru Minggu Ini",
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
-                  ),
-                  const Icon(Icons.arrow_forward, color: Colors.white70, size: 16),
-                ],
               ),
             ],
           ),

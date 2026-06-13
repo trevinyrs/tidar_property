@@ -31,6 +31,8 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
 
   late final TextEditingController _agentNameController;
   late final TextEditingController _principalNameController;
+  late final TextEditingController _notesController;
+  String _selectedPriority = "Normal";
 
   @override
   void initState() {
@@ -43,12 +45,17 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
     _principalNameController = TextEditingController(
       text: widget.existingMou?.namaPrincipal ?? ""
     );
+    _notesController = TextEditingController(
+      text: widget.existingMou?.catatan ?? ""
+    );
+    _selectedPriority = widget.existingMou?.prioritas ?? "Normal";
   }
 
   @override
   void dispose() {
     _agentNameController.dispose();
     _principalNameController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
@@ -57,7 +64,7 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'docx', 'doc', 'jpg', 'png'],
+        allowedExtensions: ['pdf'],
         allowMultiple: true,
         withData: true,
       );
@@ -203,6 +210,8 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
             fileMou: downloadUrl, 
             tanggalUpload: DateTime.now(),
             statusMou: 'Draf',
+            catatan: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+            prioritas: _selectedPriority,
             createdAt: DateTime.now(),
             title: file.title,
             fileName: file.fileName,
@@ -214,15 +223,7 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
       }
 
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BrMouAgentDetailScreen(
-            agentName: widget.agentName,
-            company: widget.company,
-          ),
-        ),
-      );
+      Navigator.pop(context);
     } catch (e) {
       setState(() => _isLoading = false);
       scaffoldMessenger.showSnackBar(
@@ -255,7 +256,7 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
             ),
             const SizedBox(height: 24),
 
-            if (isUpdate && widget.existingMou!.catatanRevisi != null) ...[
+            if (isUpdate && widget.existingMou!.catatanRevisi != null && widget.existingMou!.statusMou != 'Menunggu TTD') ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -291,7 +292,7 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
               const SizedBox(height: 24),
             ],
 
-            if (!isUpdate || widget.existingMou!.statusMou != 'Menunggu TTD') ...[
+            if (!isUpdate) ...[
               const Text(
                 "Informasi Mitra Agent",
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
@@ -340,8 +341,43 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              
+              const SizedBox(height: 20),
+
+              // Prioritas Form Input
+              const Text(
+                "Prioritas",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedPriority,
+                items: const [
+                  DropdownMenuItem(value: "Normal", child: Text("Normal")),
+                  DropdownMenuItem(value: "Urgent", child: Text("Urgent")),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedPriority = val;
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
+              ),
+              const SizedBox(height: 20),
+
               // Logo Picker
               const Text(
                 "Logo Mitra (Opsional)",
@@ -492,29 +528,7 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
 
             const SizedBox(height: 24),
 
-            // Berkas Terunggah Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Berkas Terunggah",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF96D3FD).withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    "${_tempUploadedFiles.length} Berkas",
-                    style: const TextStyle(color: Color(0xFF1F658A), fontWeight: FontWeight.bold, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
 
-            const SizedBox(height: 12),
 
             // File List
             Column(
@@ -570,6 +584,29 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
                 );
               }),
             ),
+
+            // Catatan Text Area (Hanya jika bukan Menunggu TTD)
+            if (!(isUpdate && widget.existingMou!.statusMou == 'Menunggu TTD')) ...[
+              TextField(
+                controller: _notesController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: "Tambahkan catatan...",
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12, height: 1.5),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  contentPadding: const EdgeInsets.all(16),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 24),
 

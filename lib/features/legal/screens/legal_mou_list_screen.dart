@@ -17,6 +17,22 @@ class _LegalMouListScreenState extends State<LegalMouListScreen> {
   String _selectedFilter = "Semua";
   final List<String> _filters = ["Semua", "Draf", "Revisi", "Menunggu TTD", "Aktif"];
 
+  String _selectedUrgency = "Semua Urgensi";
+  final List<String> _urgencyFilters = ["Semua Urgensi", "Normal", "Urgent"];
+  
+  String _selectedCategory = "Semua Kategori";
+  final List<String> _categoryFilters = ["Semua Kategori", "Bank", "Agent"];
+  
+  String _searchQuery = "";
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -27,34 +43,68 @@ class _LegalMouListScreenState extends State<LegalMouListScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F8),
       appBar: CustomAppBar(
-        titleWidget: Row(
-          children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: const Color(0xFFEDF1F4),
-              backgroundImage: (user?.fotoProfil != null && user!.fotoProfil!.isNotEmpty)
-                  ? NetworkImage(user.fotoProfil!)
-                  : null,
-              child: (user?.fotoProfil == null || user!.fotoProfil!.isEmpty)
-                  ? const Icon(Icons.person, size: 20, color: Colors.grey)
-                  : null,
-            ),
-            const SizedBox(width: 12),
-            Image.asset(
-              "assets/images/logo_tidar.png",
-              height: 36,
-              errorBuilder: (context, error, stackTrace) => const Text(
-                "TIMPRO",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1F658A),
+        titleWidget: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: "Cari dokumen MoU...",
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.grey[500]),
                 ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF1C2D37)),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+              )
+            : Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFEDF1F4),
+                    backgroundImage: (user?.fotoProfil != null && user!.fotoProfil!.isNotEmpty)
+                        ? NetworkImage(user.fotoProfil!)
+                        : null,
+                    child: (user?.fotoProfil == null || user!.fotoProfil!.isEmpty)
+                        ? const Icon(Icons.person, size: 20, color: Colors.grey)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Image.asset(
+                    "assets/images/logo_tidar.png",
+                    height: 36,
+                    errorBuilder: (context, error, stackTrace) => const Text(
+                      "TIMPRO",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F658A),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
-        ),
         actions: [
+          IconButton(
+            onPressed: () {
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _searchQuery = "";
+                } else {
+                  _isSearching = true;
+                }
+              });
+            },
+            icon: Icon(
+              _isSearching ? Icons.close : Icons.search,
+              color: const Color(0xFF263238),
+              size: 26,
+            ),
+          ),
           IconButton(
             onPressed: () {},
             icon: const Icon(
@@ -94,46 +144,36 @@ class _LegalMouListScreenState extends State<LegalMouListScreen> {
             ),
           ),
 
-          // ── FILTER CHIPS ──────────────────────────────────────────
+          // ── FILTER DROPDOWNS ──────────────────────────────────────────
           Container(
-            height: 52,
             color: Colors.white,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _filters.length,
-              itemBuilder: (context, index) {
-                final filter = _filters[index];
-                final isSelected = _selectedFilter == filter;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(
-                      filter,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black87,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                    selected: isSelected,
-                    selectedColor: primaryColor,
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    checkmarkColor: Colors.white,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _selectedFilter = filter;
-                        });
-                      }
-                    },
-                  ),
-                );
-              },
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                _buildFilterDropdown(
+                  label: "Pilih Status",
+                  selectedValue: _selectedFilter,
+                  options: _filters,
+                  onSelected: (val) => setState(() => _selectedFilter = val),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterDropdown(
+                  label: "Pilih Urgensi",
+                  selectedValue: _selectedUrgency,
+                  options: _urgencyFilters,
+                  onSelected: (val) => setState(() => _selectedUrgency = val),
+                ),
+                const SizedBox(width: 8),
+                _buildFilterDropdown(
+                  label: "Pilih Kategori",
+                  selectedValue: _selectedCategory,
+                  options: _categoryFilters,
+                  onSelected: (val) => setState(() => _selectedCategory = val),
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(height: 12),
 
           // ── MOU LIST STREAM ───────────────────────────────────────
           Expanded(
@@ -154,9 +194,29 @@ class _LegalMouListScreenState extends State<LegalMouListScreen> {
                 }
 
                 var documents = snapshot.data!;
+
+                if (_searchQuery.isNotEmpty) {
+                  documents = documents.where((doc) {
+                    final title = doc.title.isNotEmpty ? doc.title.toLowerCase() : doc.fileName.toLowerCase();
+                    return title.contains(_searchQuery);
+                  }).toList();
+                }
+
                 if (_selectedFilter != "Semua") {
                   documents = documents
                       .where((doc) => doc.statusMou.toLowerCase() == _selectedFilter.toLowerCase())
+                      .toList();
+                }
+
+                if (_selectedUrgency != "Semua Urgensi") {
+                  documents = documents
+                      .where((doc) => (doc.prioritas ?? 'Normal').toLowerCase() == _selectedUrgency.toLowerCase())
+                      .toList();
+                }
+
+                if (_selectedCategory != "Semua Kategori") {
+                  documents = documents
+                      .where((doc) => doc.jenisMou.toLowerCase() == _selectedCategory.toLowerCase())
                       .toList();
                 }
 
@@ -241,29 +301,63 @@ class _LegalMouListScreenState extends State<LegalMouListScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 4),
-                            Text(
-                              "Kategori: ${category.toUpperCase()}",
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                            ),
                             const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: badgeBg,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(badgeIcon, size: 12, color: badgeColor),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    mou.statusMou,
-                                    style: TextStyle(
-                                      color: badgeColor,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: badgeBg,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(badgeIcon, size: 12, color: badgeColor),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          mou.statusMou,
+                                          style: TextStyle(
+                                            color: badgeColor,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1F658A).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      category.toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Color(0xFF1F658A),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: (mou.prioritas?.toLowerCase() == 'urgent' ? Colors.red : Colors.grey).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      (mou.prioritas ?? 'Normal').toUpperCase(),
+                                      style: TextStyle(
+                                        color: mou.prioritas?.toLowerCase() == 'urgent' ? Colors.red : Colors.grey.shade700,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -288,6 +382,103 @@ class _LegalMouListScreenState extends State<LegalMouListScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFilterDropdown({
+    required String label,
+    required String selectedValue,
+    required List<String> options,
+    required Function(String) onSelected,
+  }) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.white,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (context) {
+              return SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1C2B36),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...options.map((option) {
+                      final isSelected = selectedValue == option;
+                      return ListTile(
+                        title: Text(
+                          option,
+                          style: TextStyle(
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? const Color(0xFF1F658A) : Colors.black87,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check, color: Color(0xFF1F658A))
+                            : null,
+                        onTap: () {
+                          onSelected(option);
+                          Navigator.pop(context);
+                        },
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  selectedValue,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1C2B36),
+                  ),
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xFF1C2B36)),
+            ],
+          ),
+        ),
       ),
     );
   }

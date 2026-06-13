@@ -20,6 +20,14 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
 
   String _searchQuery = "";
   String _selectedFilter = "Semua";
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   final List<Map<String, String>> _filterOptions = [
     {"value": "Semua", "label": "All Properties"},
@@ -33,44 +41,54 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: CustomAppBar(
-        titleWidget: Image.asset(
-          "assets/images/logo_tidar.png",
-          height: 38,
-          errorBuilder: (context, error, stackTrace) => const Text(
-            "TIMPRO",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1F658A),
-            ),
-          ),
-        ),
+        titleWidget: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: "Cari properti...",
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.grey[500]),
+                ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF1C2D37)),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+              )
+            : Image.asset(
+                "assets/images/logo_tidar.png",
+                height: 38,
+                errorBuilder: (context, error, stackTrace) => const Text(
+                  "TIMPRO",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F658A),
+                  ),
+                ),
+              ),
         actions: [
           IconButton(
             onPressed: () {
-              // Search action
+              setState(() {
+                if (_isSearching) {
+                  _isSearching = false;
+                  _searchController.clear();
+                  _searchQuery = "";
+                } else {
+                  _isSearching = true;
+                }
+              });
             },
-            icon: const Icon(
-              Icons.search,
+            icon: Icon(
+              _isSearching ? Icons.close : Icons.search,
               size: 26,
-              color: Color(0xFF1C2D37),
+              color: const Color(0xFF1C2D37),
             ),
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 40,
-            height: 40,
-            margin: const EdgeInsets.only(right: 20),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1C2D37),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.notifications_none_rounded,
-              color: Colors.white,
-              size: 22,
-            ),
-          ),
+          const SizedBox(width: 12),
         ],
       ),
       body: SafeArea(
@@ -188,6 +206,13 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
                   }
 
                   var properties = snapshot.data ?? [];
+
+                  if (_searchQuery.isNotEmpty) {
+                    properties = properties.where((p) =>
+                        p.title.toLowerCase().contains(_searchQuery) ||
+                        p.location.toLowerCase().contains(_searchQuery)
+                    ).toList();
+                  }
 
                   if (_selectedFilter != "Semua") {
                     properties = properties

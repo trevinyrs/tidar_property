@@ -14,6 +14,7 @@ class MouDocument {
   final String? catatan;
   final String? namaPrincipal;
   final String? logoUrl;
+  final String? prioritas;
   final DateTime createdAt;
 
   // Properti tambahan untuk kompatibilitas UI lama (jika ada)
@@ -34,6 +35,7 @@ class MouDocument {
     this.catatan,
     this.namaPrincipal,
     this.logoUrl,
+    this.prioritas,
     required this.createdAt,
     
     // Opsional untuk kompatibilitas
@@ -75,6 +77,7 @@ class MouDocument {
       catatan: data['catatan'],
       namaPrincipal: data['nama_principal'],
       logoUrl: data['logo_url'],
+      prioritas: data['prioritas'],
       createdAt: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
       
       title: data['title'] ?? data['fileName'] ?? '',
@@ -96,6 +99,7 @@ class MouDocument {
       'catatan': catatan,
       'nama_principal': namaPrincipal,
       'logo_url': logoUrl,
+      'prioritas': prioritas,
       'created_at': Timestamp.fromDate(createdAt),
       
       'title': title,
@@ -150,6 +154,7 @@ class MouDocument {
     String? catatan,
     String? namaPrincipal,
     String? logoUrl,
+    String? prioritas,
     DateTime? createdAt,
     String? title,
     String? fileName,
@@ -168,6 +173,7 @@ class MouDocument {
       catatan: catatan ?? this.catatan,
       namaPrincipal: namaPrincipal ?? this.namaPrincipal,
       logoUrl: logoUrl ?? this.logoUrl,
+      prioritas: prioritas ?? this.prioritas,
       createdAt: createdAt ?? this.createdAt,
       title: title ?? this.title,
       fileName: fileName ?? this.fileName,

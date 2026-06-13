@@ -48,7 +48,7 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'docx', 'doc'],
+        allowedExtensions: ['pdf'],
         allowMultiple: true,
         withData: true,
       );
@@ -195,6 +195,7 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
             tanggalUpload: DateTime.now(),
             statusMou: 'Draf',
             catatan: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+            prioritas: _selectedPriority,
             createdAt: DateTime.now(),
             title: file.title,
             fileName: file.fileName,
@@ -245,7 +246,7 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
             ),
             const SizedBox(height: 24),
 
-            if (isUpdate && widget.existingMou!.catatanRevisi != null) ...[
+            if (isUpdate && widget.existingMou!.catatanRevisi != null && widget.existingMou!.statusMou != 'Menunggu TTD') ...[
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -414,22 +415,7 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
               ),
             ),
 
-            const SizedBox(height: 24),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  "Dokumen Terunggah",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
-                ),
-                Text(
-                  "${_tempUploadedFiles.length} FILE",
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
 
             // List File Terunggah
             _tempUploadedFiles.isEmpty

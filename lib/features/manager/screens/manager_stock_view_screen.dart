@@ -16,7 +16,14 @@ class ManagerStockViewScreen extends StatefulWidget {
 class _ManagerStockViewScreenState extends State<ManagerStockViewScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = "";
-  String _selectedStatus = "All"; // All, Available, Booking
+  String _selectedStatus = "All"; // All, Available, Sold
+  late Stream<List<Property>> _propertiesStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _propertiesStream = Provider.of<PropertyService>(context, listen: false).getProperties();
+  }
 
   @override
   void dispose() {
@@ -76,7 +83,7 @@ class _ManagerStockViewScreenState extends State<ManagerStockViewScreen> {
         children: [
           Expanded(
             child: StreamBuilder<List<Property>>(
-              stream: Provider.of<PropertyService>(context, listen: false).getProperties(),
+              stream: _propertiesStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -91,7 +98,6 @@ class _ManagerStockViewScreenState extends State<ManagerStockViewScreen> {
                 // Compute statistics
                 final totalStock = properties.length;
                 final available = properties.where((p) => p.status.toUpperCase() == "AVAILABLE").length;
-                final booking = properties.where((p) => p.status.toUpperCase() == "BOOKING").length;
                 final sold = properties.where((p) => p.status.toUpperCase() == "SOLD").length;
 
                 // Apply search & status filter
@@ -131,18 +137,12 @@ class _ManagerStockViewScreenState extends State<ManagerStockViewScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Statistics Grid (2x2)
+                      // Statistics Grid
                       Row(
                         children: [
-                          _buildStatCard("TOTAL STOCK", totalStock.toString(), primaryColor),
+                          _buildStatCard("TOTAL STOCK", totalStock.toString(), const Color(0xFF1F658A)),
                           const SizedBox(width: 12),
                           _buildStatCard("AVAILABLE", available.toString(), const Color(0xFF10B981)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _buildStatCard("BOOKING", booking.toString(), const Color(0xFFF59E0B)),
                           const SizedBox(width: 12),
                           _buildStatCard("SOLD OUT", sold.toString(), const Color(0xFF6B7280)),
                         ],
@@ -179,7 +179,7 @@ class _ManagerStockViewScreenState extends State<ManagerStockViewScreen> {
                           const SizedBox(width: 8),
                           _buildFilterChip("Available"),
                           const SizedBox(width: 8),
-                          _buildFilterChip("Booking"),
+                          _buildFilterChip("Sold"),
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -215,23 +215,33 @@ class _ManagerStockViewScreenState extends State<ManagerStockViewScreen> {
   Widget _buildStatCard(String title, String count, Color color) {
     return Expanded(
       child: Container(
+        height: 100, // Menyeragamkan tinggi card
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color.withOpacity(0.15)),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.01),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               count,
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color, height: 1.0),
             ),
           ],
         ),
@@ -281,9 +291,6 @@ class _ManagerStockViewScreenState extends State<ManagerStockViewScreen> {
     switch (property.status.toUpperCase()) {
       case "AVAILABLE":
         statusColor = const Color(0xFF10B981);
-        break;
-      case "BOOKING":
-        statusColor = const Color(0xFFF59E0B);
         break;
       case "SOLD":
       default:

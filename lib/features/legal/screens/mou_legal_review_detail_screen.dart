@@ -154,10 +154,17 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
   // Buka Pratinjau PDF / Download manual
   void _downloadAndReviewDocument(BuildContext context) async {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final Uri url = Uri.parse(widget.mou.fileMou);
-    if (await canLaunchUrl(url)) {
+    
+    var urlString = widget.mou.fileMou;
+    if (!urlString.startsWith('http')) {
+      urlString = 'https://$urlString';
+    }
+    
+    final Uri url = Uri.parse(urlString);
+    
+    try {
       await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
+    } catch (e) {
       scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text("Gagal membuka link dokumen"), backgroundColor: Colors.red),
       );
@@ -454,35 +461,7 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
                     ),
                   ),
 
-                  const SizedBox(height: 20),
 
-                  // ── BAR RIWAYAT PERUBAHAN ───────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Riwayat Perubahan Dokumen",
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          style: TextButton.styleFrom(
-                            foregroundColor: primaryColor,
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                          ),
-                          child: const Text(
-                            "LIHAT SEMUA",
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 12),
 
                   // ── PDF PREVIEW CONTAINER (SPLIT-VIEW) ──────────────
                   // ── DOCK DOWNLOAD & TINJAU DOKUMEN ──────────────────

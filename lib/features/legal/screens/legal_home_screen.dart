@@ -26,20 +26,29 @@ class LegalHomeScreen extends StatefulWidget {
 class _LegalHomeScreenState extends State<LegalHomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = [
-    const LegalDashboardContent(), // Beranda
-    const LegalMouListScreen(),
-    const LegalProfileScreen(),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      LegalDashboardContent(
+        onNavigateToMou: () {
+          setState(() {
+            _currentIndex = 1;
+          });
+        },
+      ), // Beranda
+      const LegalMouListScreen(),
+      const LegalProfileScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bgColor,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: RoleBottomNav(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -55,7 +64,9 @@ class _LegalHomeScreenState extends State<LegalHomeScreen> {
 
 // ================== DASHBOARD CONTENT ==================
 class LegalDashboardContent extends StatelessWidget {
-  const LegalDashboardContent({super.key});
+  final VoidCallback onNavigateToMou;
+
+  const LegalDashboardContent({super.key, required this.onNavigateToMou});
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +80,8 @@ class LegalDashboardContent extends StatelessWidget {
             CircleAvatar(
               radius: 20,
               backgroundColor: const Color(0xFFEDF1F4),
-              backgroundImage: (user?.fotoProfil != null && user!.fotoProfil!.isNotEmpty)
+              backgroundImage:
+                  (user?.fotoProfil != null && user!.fotoProfil!.isNotEmpty)
                   ? NetworkImage(user.fotoProfil!)
                   : null,
               child: (user?.fotoProfil == null || user!.fotoProfil!.isEmpty)
@@ -119,7 +131,9 @@ class LegalDashboardContent extends StatelessWidget {
                   Builder(
                     builder: (context) {
                       final firstName = (user?.name ?? '').split(' ').first;
-                      final greeting = firstName.isNotEmpty ? firstName : 'Legal';
+                      final greeting = firstName.isNotEmpty
+                          ? firstName
+                          : 'Legal';
                       return Text(
                         'Selamat datang, $greeting 👋',
                         style: const TextStyle(
@@ -173,201 +187,218 @@ class LegalDashboardContent extends StatelessWidget {
               ),
             ),
 
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // ── AKTIVITAS TERBARU ───────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Aktivitas Terbaru',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1C2B36),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    foregroundColor: _primary,
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Lihat Semua',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          StreamBuilder<List<MouDocument>>(
-            stream: Provider.of<MouService>(context, listen: false)
-                .getRecentMousStream(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: _cardWhite,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+            // ── AKTIVITAS TERBARU ───────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Aktivitas Terbaru',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1C2B36),
                     ),
-                    child: const Center(
-                      child: Text(
-                        'Belum ada aktivitas terbaru',
-                        style: TextStyle(color: Color(0xFF9E9E9E)),
+                  ),
+                  TextButton(
+                    onPressed: onNavigateToMou,
+                    style: TextButton.styleFrom(
+                      foregroundColor: _primary,
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Lihat Semua',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
-                );
-              }
-
-              final activities = snapshot.data!;
-
-              return Column(
-                children: activities.map((mou) {
-                  return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              MouLegalReviewDetailScreen(mou: mou),
-                        ),
-                      );
-                    },
-                    child: _buildActivityItem(
-                      mou.title.isNotEmpty ? mou.title : mou.fileName,
-                      mou.jenisMou,
-                      mou.statusMou,
-                    ),
-                  );
-                }).toList(),
-              );
-            },
-          ),
-
-          const SizedBox(height: 24),
-
-          // ── BANNER PEDOMAN HUKUM ────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1F658A), Color(0xFF2A8BBF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'PEMBARUAN',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const Text(
-                          'Pedoman Hukum\nProperti 2025',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            height: 1.25,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Ketentuan baru mengenai legalitas\nkontrak & properti.',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            height: 1.4,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(Icons.download_rounded, size: 16),
-                          label: const Text('Unduh PDF'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: _primary,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            textStyle: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.gavel_rounded,
-                        color: Colors.white, size: 36),
                   ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 10),
 
-          const SizedBox(height: 100),
-        ],
+            StreamBuilder<List<MouDocument>>(
+              stream: Provider.of<MouService>(
+                context,
+                listen: false,
+              ).getRecentMousStream(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 16,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: _cardWhite,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'Belum ada aktivitas terbaru',
+                          style: TextStyle(color: Color(0xFF9E9E9E)),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                final activities = snapshot.data!;
+
+                return Column(
+                  children: activities.map((mou) {
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                MouLegalReviewDetailScreen(mou: mou),
+                          ),
+                        );
+                      },
+                      child: _buildActivityItem(
+                        mou.title.isNotEmpty ? mou.title : mou.fileName,
+                        mou.jenisMou,
+                        mou.statusMou,
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── BANNER PEDOMAN HUKUM ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1F658A), Color(0xFF2A8BBF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'PEMBARUAN',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Pedoman Hukum\nProperti 2025',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Ketentuan baru mengenai legalitas\nkontrak & properti.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: () {},
+                            icon: const Icon(Icons.download_rounded, size: 16),
+                            label: const Text('Unduh PDF'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: _primary,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.gavel_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 100),
+          ],
+        ),
       ),
-    ));
+    );
   }
 
   Widget _buildActivityItem(String title, String subtitle, String status) {
@@ -412,11 +443,12 @@ class LegalDashboardContent extends StatelessWidget {
           Container(
             width: 50,
             height: 50,
-            decoration: BoxDecoration(
-              color: badgeBg,
-              shape: BoxShape.circle,
+            decoration: BoxDecoration(color: badgeBg, shape: BoxShape.circle),
+            child: Icon(
+              Icons.description_outlined,
+              color: badgeColor,
+              size: 22,
             ),
-            child: Icon(Icons.description_outlined, color: badgeColor, size: 22),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -439,15 +471,16 @@ class LegalDashboardContent extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                      color: Color(0xFF7B8D9A), fontSize: 12),
+                    color: Color(0xFF7B8D9A),
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 10),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
               color: badgeBg,
               borderRadius: BorderRadius.circular(20),
@@ -481,12 +514,14 @@ class LegalDashboardContent extends StatelessWidget {
     IconData icon,
   ) {
     final Stream<int> countStream =
-        Provider.of<MouService>(context, listen: false)
-            .getMousStream()
-            .map((list) => list
-                .where((mou) =>
-                    mou.statusMou.toLowerCase() == statusKeyword.toLowerCase())
-                .length);
+        Provider.of<MouService>(context, listen: false).getMousStream().map(
+          (list) => list
+              .where(
+                (mou) =>
+                    mou.statusMou.toLowerCase() == statusKeyword.toLowerCase(),
+              )
+              .length,
+        );
 
     return Expanded(
       child: StreamBuilder<int>(

@@ -16,7 +16,14 @@ class BrStockScreen extends StatefulWidget {
 class _BrStockScreenState extends State<BrStockScreen> {
   final PropertyService _propertyService = PropertyService();
   String _searchQuery = "";
-  String _selectedStatus = "All"; // All, Available, Booking, Sold
+  String _selectedStatus = "All"; // All, Available, Sold
+  late Stream<List<Property>> _propertiesStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _propertiesStream = _propertyService.getProperties();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +71,7 @@ class _BrStockScreenState extends State<BrStockScreen> {
           // Main Content StreamBuilder
           Expanded(
             child: StreamBuilder<List<Property>>(
-              stream: _propertyService.getProperties(),
+              stream: _propertiesStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -78,9 +85,8 @@ class _BrStockScreenState extends State<BrStockScreen> {
 
                 // Compute statistics
                 final totalStock = properties.length;
-                final available = properties.where((p) => p.status == "AVAILABLE").length;
-                final booking = properties.where((p) => p.status == "BOOKING").length;
-                final sold = properties.where((p) => p.status == "SOLD").length;
+                final available = properties.where((p) => p.status.toUpperCase() == "AVAILABLE").length;
+                final sold = properties.where((p) => p.status.toUpperCase() == "SOLD").length;
 
                 // Apply search & status filter
                 var filteredProperties = properties;
@@ -149,12 +155,6 @@ class _BrStockScreenState extends State<BrStockScreen> {
                           _buildStatCard("TOTAL STOCK", totalStock.toString(), const Color(0xFF1F658A)),
                           const SizedBox(width: 12),
                           _buildStatCard("AVAILABLE", available.toString(), const Color(0xFF10B981)),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _buildStatCard("BOOKING", booking.toString(), const Color(0xFFF59E0B)),
                           const SizedBox(width: 12),
                           _buildStatCard("SOLD OUT", sold.toString(), const Color(0xFF6B7280)),
                         ],
@@ -190,7 +190,7 @@ class _BrStockScreenState extends State<BrStockScreen> {
                           const SizedBox(width: 8),
                           _buildFilterChip("Available"),
                           const SizedBox(width: 8),
-                          _buildFilterChip("Booking"),
+                          _buildFilterChip("Sold"),
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -226,6 +226,7 @@ class _BrStockScreenState extends State<BrStockScreen> {
   Widget _buildStatCard(String title, String count, Color color) {
     return Expanded(
       child: Container(
+        height: 100, // Menyeragamkan tinggi card
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -234,15 +235,18 @@ class _BrStockScreenState extends State<BrStockScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               count,
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color, height: 1.0),
             ),
           ],
         ),
@@ -288,9 +292,6 @@ class _BrStockScreenState extends State<BrStockScreen> {
     switch (property.status.toUpperCase()) {
       case "AVAILABLE":
         statusColor = const Color(0xFF10B981);
-        break;
-      case "BOOKING":
-        statusColor = const Color(0xFFF59E0B);
         break;
       case "SOLD":
       default:
