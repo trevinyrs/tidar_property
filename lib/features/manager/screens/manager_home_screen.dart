@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:tidar_property/features/manager/screens/manager_mou_report_screen.dart';
 import 'package:tidar_property/features/manager/screens/manager_sales_screen.dart';
 import 'package:tidar_property/features/manager/screens/manager_stock_view_screen.dart';
@@ -147,6 +148,7 @@ class MultiStreamBuilder extends StatelessWidget {
   Widget build(BuildContext context) {
     final mouStream = Provider.of<MouService>(context, listen: false).getMousStream();
     final propStream = Provider.of<PropertyService>(context, listen: false).getProperties();
+    final salesStream = FirebaseFirestore.instance.collection('tb_penjualan').snapshots();
 
     return StreamBuilder<List<MouDocument>>(
       stream: mouStream,
@@ -154,87 +156,101 @@ class MultiStreamBuilder extends StatelessWidget {
         return StreamBuilder<List<Property>>(
           stream: propStream,
           builder: (context, propSnapshot) {
-            final mous = mouSnapshot.data ?? [];
-            final props = propSnapshot.data ?? [];
+            return StreamBuilder<QuerySnapshot>(
+              stream: salesStream,
+              builder: (context, salesSnapshot) {
+                final mous = mouSnapshot.data ?? [];
+                final props = propSnapshot.data ?? [];
+                final salesDocs = salesSnapshot.data?.docs ?? [];
 
-            final activeMousCount = mous.where((m) => m.statusMou.toLowerCase() == 'aktif').length;
-            final waitingTtdCount = mous.where((m) => m.statusMou.toLowerCase() == 'menunggu ttd').length;
-            final totalPropsCount = props.length;
-            
-            // Occupancy rate calculation (Available vs Sold)
-            final soldProps = props.where((p) => p.statusProperti.toLowerCase() == 'sold').length;
-            final occupancyRate = totalPropsCount > 0 ? ((soldProps / totalPropsCount) * 100).round() : 85;
+                final activeMousCount = mous.where((m) => m.statusMou.toLowerCase() == 'aktif').length;
+                final waitingTtdCount = mous.where((m) => m.statusMou.toLowerCase() == 'menunggu ttd').length;
+                final totalPropsCount = props.length;
+                
+                // Occupancy rate calculation (Available vs Sold)
+                final soldProps = props.where((p) => p.statusProperti.toLowerCase() == 'sold').length;
+                final occupancyRate = totalPropsCount > 0 ? ((soldProps / totalPropsCount) * 100).round() : 85;
 
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-                    child: Text(
-                      "Berikut adalah ringkasan kinerja properti Anda hari ini.",
-                      style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
-                    ),
-                  ),
+                // Total Sales Calculation (Base + Real)
+                double realTotalSales = 0;
+                for (var doc in salesDocs) {
+                  final data = doc.data() as Map<String, dynamic>? ?? {};
+                  realTotalSales += (data['harga'] ?? data['price'] ?? 0).toDouble();
+                }
+                const double baseSales = 42800000000; // Rp 42.8 Milyar base
+                final double finalSales = baseSales + realTotalSales;
+                final String totalSalesText = "Rp ${(finalSales / 1000000000).toStringAsFixed(1)}M";
 
-                  const SizedBox(height: 12),
-
-                  // ── RINGKASAN KINERJA CARDS ────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        // Card 1: TOTAL PENJUALAN
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: cardWhite,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.02),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: primaryColor.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(Icons.monetization_on_outlined, color: primaryColor, size: 28),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      "TOTAL PENJUALAN",
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      "Rp 12,4M",
-                                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    const Text(
-                                      "+8.2% bulan ini",
-                                      style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                        child: Text(
+                          "Berikut adalah ringkasan kinerja properti Anda hari ini.",
+                          style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.4),
                         ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // ── RINGKASAN KINERJA CARDS ────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Column(
+                          children: [
+                            // Card 1: TOTAL PENJUALAN
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: cardWhite,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.02),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: primaryColor.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(Icons.monetization_on_outlined, color: primaryColor, size: 28),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "TOTAL PENJUALAN",
+                                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          totalSalesText,
+                                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        const Text(
+                                          "+8.2% bulan ini",
+                                          style: TextStyle(fontSize: 11, color: Colors.green, fontWeight: FontWeight.bold),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                         
                         const SizedBox(height: 12),
 
@@ -385,43 +401,16 @@ class MultiStreamBuilder extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
-
-                  // ── LIST AKTIVITAS TERKINI ──────────────────────────
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      "Aktivitas Terkini",
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  _buildActivityItem(
-                    title: "MOU Baru: Tidar Regency B-12",
-                    subtitle: "Business Representative (BR) mengunggah berkas",
-                    amount: "Rp 1.2M",
-                    time: "2 jam lalu",
-                    iconColor: primaryColor,
-                    icon: Icons.description_outlined,
-                  ),
-                  _buildActivityItem(
-                    title: "Pembayaran Berhasil: Unit B-05",
-                    subtitle: "Transaksi closing agen properti sukses divalidasi",
-                    amount: "Rp 150jt",
-                    time: "5 jam lalu",
-                    iconColor: secondaryColor,
-                    icon: Icons.payments_outlined,
-                  ),
-
-                  const SizedBox(height: 100),
-                ],
-              ),
+                          const SizedBox(height: 100),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
             );
           },
         );
-      },
-    );
   }
 
   Widget _buildSmallStatCard({
@@ -492,66 +481,4 @@ class MultiStreamBuilder extends StatelessWidget {
     );
   }
 
-  Widget _buildActivityItem({
-    required String title,
-    required String subtitle,
-    required String amount,
-    required String time,
-    required Color iconColor,
-    required IconData icon,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cardWhite,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.01),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: TextStyle(fontSize: 9, color: Colors.grey.shade400),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            amount,
-            style: TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
 }

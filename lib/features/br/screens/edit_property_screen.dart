@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import '../../../core/services/property_service.dart';
 import '../../../core/services/project_service.dart';
@@ -28,6 +29,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
   late TextEditingController _priceController;
   late TextEditingController _landAreaController;
   late TextEditingController _buildingAreaController;
+  late TextEditingController _dealPriceController;
 
   late int _bedrooms;
   late int _bathrooms;
@@ -51,6 +53,7 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     _priceController = TextEditingController(text: widget.property.price.toStringAsFixed(0));
     _landAreaController = TextEditingController(text: widget.property.landArea.toStringAsFixed(0));
     _buildingAreaController = TextEditingController(text: widget.property.buildingArea.toStringAsFixed(0));
+    _dealPriceController = TextEditingController(text: widget.property.harga.toStringAsFixed(0));
 
     _bedrooms = widget.property.bedrooms;
     _bathrooms = widget.property.bathrooms;
@@ -182,6 +185,22 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
     setState(() => _isLoading = false);
 
     if (success) {
+      // Record Sale if status just changed to 'Sold'
+      if (widget.property.status.toLowerCase() != 'sold' && _selectedStatus == 'Sold') {
+        try {
+          final dealPrice = double.tryParse(_dealPriceController.text) ?? widget.property.harga;
+          await FirebaseFirestore.instance.collection('tb_penjualan').add({
+            'harga': dealPrice,
+            'properti_title': _titleController.text.trim(),
+            'kode_unit': widget.property.kodeUnit,
+            'nama_agen': widget.property.agentId.isNotEmpty ? widget.property.agentId : 'Agen Internal/Timpro',
+            'created_at': FieldValue.serverTimestamp(),
+          });
+        } catch (e) {
+          print("Error saving to tb_penjualan: $e");
+        }
+      }
+
       final messenger = ScaffoldMessenger.of(context);
       final navigator = Navigator.of(context);
       try {
@@ -600,6 +619,16 @@ class _EditPropertyScreenState extends State<EditPropertyScreen> {
                             ],
                             onChanged: (value) => setState(() => _selectedStatus = value!),
                           ),
+                          if (_selectedStatus == "Sold") ...[
+                            const SizedBox(height: 16),
+                            _buildInputLabel("HARGA KESEPAKATAN (HARGA DEAL)"),
+                            TextFormField(
+                              controller: _dealPriceController,
+                              keyboardType: TextInputType.number,
+                              validator: (val) => val == null || val.isEmpty ? "Wajib diisi" : null,
+                              decoration: _buildInputDecoration("Masukkan harga kesepakatan akhir..."),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           _buildInputLabel("PROYEK"),
                           StreamBuilder<List<Project>>(

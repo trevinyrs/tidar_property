@@ -4,7 +4,13 @@ import 'package:intl/intl.dart';
 import '../../../core/services/mou_service.dart';
 import '../../../models/mou_model.dart';
 import '../../../widgets/custom_app_bar.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:excel/excel.dart';
 import '../../../core/providers/user_provider.dart';
+import 'manager_mou_list_screen.dart';
+import 'manager_mou_detail_screen.dart';
 
 class ManagerMouReportScreen extends StatelessWidget {
   const ManagerMouReportScreen({super.key});
@@ -218,15 +224,37 @@ class ManagerMouReportScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
                         "MoU Terbaru",
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                       ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: () async {
+                          await _exportToExcel(context, allMous);
+                        },
+                        icon: const Icon(Icons.download_rounded, color: Color(0xFF1F658A), size: 22),
+                        tooltip: "Export Laporan (.xlsx)",
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 16),
                       TextButton(
-                        onPressed: () {},
-                        style: TextButton.styleFrom(foregroundColor: primaryColor),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ManagerMouListScreen(),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: primaryColor,
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         child: const Text("Lihat Semua", style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                     ],
@@ -260,16 +288,21 @@ class ManagerMouReportScreen extends StatelessWidget {
 
                           return Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: cardWhite,
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 10)
-                                ],
-                              ),
-                              child: Row(
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => ManagerMouDetailScreen(mou: mou)));
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: cardWhite,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 10)
+                                  ],
+                                ),
+                                child: Row(
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.all(10),
@@ -312,6 +345,7 @@ class ManagerMouReportScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
+                          )
                           );
                         },
                       ),
@@ -407,5 +441,89 @@ class ManagerMouReportScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _exportToExcel(BuildContext context, List<MouDocument> mous) async {
+    try {
+      final excel = Excel.createExcel();
+      final sheet = excel['Laporan MoU'];
+      excel.setDefaultSheet('Laporan MoU');
+
+      // Define Styles
+      final headerStyle = CellStyle(
+        backgroundColorHex: ExcelColor.blue,
+        fontColorHex: ExcelColor.white,
+        bold: true,
+        horizontalAlign: HorizontalAlign.Center,
+        verticalAlign: VerticalAlign.Center,
+      );
+
+      // Add Headers
+      final headers = [
+        "ID Dokumen", 
+        "Nama Mitra", 
+        "Tipe MoU (Agent/Bank)", 
+        "Status Dokumen", 
+        "Tanggal Unggah", 
+        "Prioritas"
+      ];
+      
+      for (var col = 0; col < headers.length; col++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+        cell.value = TextCellValue(headers[col]);
+        cell.cellStyle = headerStyle;
+      }
+
+      // Add Rows
+      for (var row = 0; row < mous.length; row++) {
+        final mou = mous[row];
+        final id = mou.idMou;
+        final partner = mou.idAgent ?? mou.idBank ?? "Tanpa Nama";
+        final type = mou.jenisMou.toUpperCase();
+        final status = mou.statusMou;
+        final date = DateFormat('yyyy-MM-dd').format(mou.tanggalUpload);
+        final priority = mou.prioritas ?? 'Normal';
+
+        final values = [id, partner, type, status, date, priority];
+
+        for (var col = 0; col < values.length; col++) {
+          final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row + 1));
+          cell.value = TextCellValue(values[col]);
+
+          // Styling specific cells (e.g. status)
+          if (col == 3) {
+            if (status.toLowerCase() == 'aktif' || status.toLowerCase() == 'disetujui') {
+              cell.cellStyle = CellStyle(fontColorHex: ExcelColor.green, bold: true);
+            } else if (status.toLowerCase() == 'revisi') {
+              cell.cellStyle = CellStyle(fontColorHex: ExcelColor.red, bold: true);
+            } else {
+              cell.cellStyle = CellStyle(fontColorHex: ExcelColor.orange, bold: true);
+            }
+          }
+        }
+      }
+
+      // Save to temp directory
+      final fileBytes = excel.save();
+      if (fileBytes == null) throw Exception("Gagal menghasilkan file Excel");
+
+      final directory = await getTemporaryDirectory();
+      final String timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final path = '${directory.path}/Laporan_MoU_$timestamp.xlsx';
+      
+      final File file = File(path);
+      await file.writeAsBytes(fileBytes);
+
+      // Share the file
+      final XFile xFile = XFile(path);
+      await Share.shareXFiles([xFile], text: 'Laporan MoU Timpro');
+      
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal meng-export data: $e")),
+        );
+      }
+    }
   }
 }

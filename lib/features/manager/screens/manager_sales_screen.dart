@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../core/providers/user_provider.dart';
+import 'manager_sales_list_screen.dart';
+import 'manager_sales_detail_screen.dart';
 
 class ManagerSalesScreen extends StatefulWidget {
   const ManagerSalesScreen({super.key});
@@ -291,11 +293,28 @@ class _ManagerSalesScreenState extends State<ManagerSalesScreen> {
                 const SizedBox(height: 24),
 
                 // ── LIST CLOSING TERAKHIR ────────────────────────────
-                const Padding(
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    "Closing Terakhir",
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Closing Terakhir",
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ManagerSalesListScreen()),
+                          );
+                        },
+                        child: Text(
+                          "Lihat Semua",
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryColor),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -321,10 +340,9 @@ class _ManagerSalesScreenState extends State<ManagerSalesScreen> {
                           final harga = (data['harga'] ?? data['price'] ?? 0).toDouble();
                           final agent = data['nama_agen'] ?? data['agent'] ?? 'Agen Tidar';
                           
-                          // format price
                           final priceText = "Rp ${harga.toStringAsFixed(0)}";
 
-                          return _buildClosingItem(title, unit, priceText, agent, primaryColor);
+                          return _buildClosingItem(title, unit, priceText, agent, primaryColor, rawData: data);
                         },
                       ),
 
@@ -382,18 +400,23 @@ class _ManagerSalesScreenState extends State<ManagerSalesScreen> {
     );
   }
 
-  Widget _buildClosingItem(String property, String unit, String price, String agent, Color primaryColor) {
+  Widget _buildClosingItem(String property, String unit, String price, String agent, Color primaryColor, {Map<String, dynamic>? rawData}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 10)
-          ],
-        ),
+      child: InkWell(
+        onTap: rawData != null ? () {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => ManagerSalesDetailScreen(data: rawData)));
+        } : null,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.01), blurRadius: 10)
+            ],
+          ),
         child: Row(
           children: [
             Container(
@@ -425,6 +448,7 @@ class _ManagerSalesScreenState extends State<ManagerSalesScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
