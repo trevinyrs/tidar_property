@@ -26,13 +26,6 @@ class _BrHomeScreenState extends State<BrHomeScreen> {
     const BrDashboardContent(),
     const BrMouScreen(),
     const BrStockScreen(),
-    const Center(
-      child: Text(
-        "📊 Reports\n\nComing Soon",
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 20),
-      ),
-    ),
     const BrProfileScreen(),
   ];
 

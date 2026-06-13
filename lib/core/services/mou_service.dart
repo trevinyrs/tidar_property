@@ -1,8 +1,71 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../models/mou_model.dart';
 
 class MouService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // Upload file MoU ke Supabase Storage (Menggunakan bucket properti_images agar tidak perlu membuat bucket baru)
+  Future<String?> uploadMouFile({
+    required String fileName,
+    required String jenisMou,
+    Uint8List? fileBytes,
+    String? filePath,
+  }) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final String uniqueId = _db.collection('tb_mou').doc().id;
+      final String extension = fileName.contains('.') ? fileName.split('.').last : 'pdf';
+      final String sanitizedName = '${uniqueId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final String pathFolder = 'mou_documents/$jenisMou/$sanitizedName';
+      
+      if (fileBytes != null) {
+        await supabase.storage.from('properti_images').uploadBinary(
+          pathFolder,
+          fileBytes,
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        );
+      } else if (filePath != null) {
+        await supabase.storage.from('properti_images').upload(
+          pathFolder,
+          File(filePath),
+          fileOptions: const FileOptions(cacheControl: '3600', upsert: true),
+        );
+      } else {
+        throw Exception("File data is missing");
+      }
+      
+      final String downloadUrl = supabase.storage.from('properti_images').getPublicUrl(pathFolder);
+      return downloadUrl;
+    } catch (e) {
+      print("Error uploadMouFile Supabase: $e");
+      return null;
+    }
+  }
+
+  // Hapus file dari Supabase Storage
+  Future<bool> deleteMouFile(String fileUrl) async {
+    try {
+      if (fileUrl.isEmpty) return false;
+      final supabase = Supabase.instance.client;
+      final bucketName = 'properti_images';
+      final uri = Uri.parse(fileUrl);
+      final pathSegments = uri.pathSegments;
+      
+      final bucketIndex = pathSegments.indexOf(bucketName);
+      if (bucketIndex != -1 && bucketIndex < pathSegments.length - 1) {
+        final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
+        await supabase.storage.from(bucketName).remove([filePath]);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("Error deleteMouFile Supabase: $e");
+      return false;
+    }
+  }
 
   // Tambah MOU Baru
   Future<String?> addMou(MouDocument mou) async {
@@ -25,6 +88,7 @@ class MouService {
       return false;
     }
   }
+
 
   // Ambil Semua MOU (Real-time Stream)
   Stream<List<MouDocument>> getMousStream() {

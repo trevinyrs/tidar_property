@@ -8,6 +8,7 @@ import 'core/providers/favorite_provider.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/property_service.dart';
 import 'core/services/mou_service.dart';
+import 'core/services/project_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'firebase_options.dart';
 
@@ -41,6 +42,9 @@ class MyApp extends StatelessWidget {
         ),
         Provider<MouService>(
           create: (_) => MouService(),
+        ),
+        Provider<ProjectService>(
+          create: (_) => ProjectService(),
         ),
         ChangeNotifierProvider(
           create: (_) => UserProvider()..startUserListener(),

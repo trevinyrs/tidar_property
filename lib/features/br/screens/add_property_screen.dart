@@ -7,7 +7,9 @@ import 'package:latlong2/latlong.dart';
 import 'package:geocoding/geocoding.dart' as geo;
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/property_service.dart';
+import '../../../core/services/project_service.dart';
 import '../../../models/property_model.dart';
+import '../../../models/project_model.dart';
 
 class AddPropertyScreen extends StatefulWidget {
   const AddPropertyScreen({super.key});
@@ -31,6 +33,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
   String _selectedType = "rumah";
   String _selectedStatus = "AVAILABLE";
+  String? _selectedProjectId;
 
   bool _isLoading = false;
   List<File> _selectedImages = [];
@@ -61,7 +64,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
 
     final property = Property(
       idProperti: "",
-      idProyek: "dummy_proyek",
+      idProyek: _selectedProjectId ?? "dummy_proyek",
       kodeUnit: "UNIT-${DateTime.now().millisecondsSinceEpoch}",
       tipeRumah: _selectedType,
       luasTanah: double.tryParse(_landAreaController.text) ?? 0,
@@ -543,7 +546,7 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          _buildInputLabel("TIPE PROPERTI"),
+                           _buildInputLabel("TIPE PROPERTI"),
                           DropdownButtonFormField<String>(
                             value: _selectedType,
                             decoration: _buildInputDecoration("Pilih Tipe"),
@@ -553,6 +556,38 @@ class _AddPropertyScreenState extends State<AddPropertyScreen> {
                               DropdownMenuItem(value: "tanah", child: Text("Tanah")),
                             ],
                             onChanged: (value) => setState(() => _selectedType = value!),
+                          ),
+                          const SizedBox(height: 16),
+                          _buildInputLabel("PROYEK"),
+                          StreamBuilder<List<Project>>(
+                            stream: Provider.of<ProjectService>(context, listen: false).getProjects(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              final projects = snapshot.data!;
+                              if (projects.isEmpty) {
+                                return const Text(
+                                  "Belum ada proyek tersedia. Harap tambahkan proyek terlebih dahulu.",
+                                  style: TextStyle(color: Colors.red, fontSize: 12),
+                                );
+                              }
+                              // Set default project selection if null or not in list
+                              if (_selectedProjectId == null || !projects.any((p) => p.idProyek == _selectedProjectId)) {
+                                _selectedProjectId = projects.first.idProyek;
+                              }
+                              return DropdownButtonFormField<String>(
+                                value: _selectedProjectId,
+                                decoration: _buildInputDecoration("Pilih Proyek"),
+                                items: projects.map((project) {
+                                  return DropdownMenuItem(
+                                    value: project.idProyek,
+                                    child: Text(project.namaProyek),
+                                  );
+                                }).toList(),
+                                onChanged: (value) => setState(() => _selectedProjectId = value),
+                              );
+                            },
                           ),
                         ],
                       ),

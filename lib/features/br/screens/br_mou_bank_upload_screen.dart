@@ -1,3 +1,4 @@
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
@@ -8,8 +9,13 @@ import '../../../widgets/custom_app_bar.dart';
 
 class BrMouBankUploadScreen extends StatefulWidget {
   final String bankName;
+  final MouDocument? existingMou;
 
-  const BrMouBankUploadScreen({super.key, required this.bankName});
+  const BrMouBankUploadScreen({
+    super.key, 
+    required this.bankName,
+    this.existingMou,
+  });
 
   @override
   State<BrMouBankUploadScreen> createState() => _BrMouBankUploadScreenState();
@@ -20,6 +26,9 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
   String _selectedPriority = "Normal";
   final _notesController = TextEditingController();
   List<MouDocument> _tempUploadedFiles = [];
+  List<PlatformFile> _pickedFiles = [];
+  PlatformFile? _pickedLogoFile;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -35,18 +44,21 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
   }
 
   Future<void> _pickAndUploadFile() async {
+    if (_isLoading) return;
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'docx', 'doc'],
         allowMultiple: true,
+        withData: true,
       );
 
       if (result != null) {
         setState(() {
           for (var file in result.files) {
+            _pickedFiles.add(file);
             final mou = MouDocument(
-              idMou: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+              idMou: 'temp_${DateTime.now().millisecondsSinceEpoch}_${file.name}',
               idBank: _bankNameController.text,
               jenisMou: 'Bank',
               fileMou: file.name,
@@ -83,12 +95,35 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
   }
 
   Future<void> _deleteFile(int index) async {
+    if (_isLoading) return;
     setState(() {
       _tempUploadedFiles.removeAt(index);
+      _pickedFiles.removeAt(index);
     });
   }
 
+  Future<void> _pickLogoImage() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result != null) {
+        setState(() {
+          _pickedLogoFile = result.files.first;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal memilih logo: $e"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _ajukanUntukTinjauan() async {
+    if (_isLoading) return;
     final mouService = Provider.of<MouService>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final bankName = _bankNameController.text.trim();
@@ -107,39 +142,97 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
       return;
     }
 
-    // Simpan semua temp files ke Firestore secara berurutan sesuai flowchart
-    for (var file in _tempUploadedFiles) {
-      final finalDoc = MouDocument(
-        idMou: '',
-        idBank: bankName,
-        jenisMou: 'Bank',
-        fileMou: file.fileName,
-        tanggalUpload: DateTime.now(),
-        statusMou: 'Draf', // Tahap pertama flowchart
-        catatan: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
-        createdAt: DateTime.now(),
-        title: file.title,
-        fileName: file.fileName,
-        fileSize: file.fileSize,
-      );
-      await mouService.addMou(finalDoc);
-    }
+    setState(() => _isLoading = true);
 
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BrMouBankDetailScreen(bankName: bankName),
-      ),
-    );
+    try {
+      String? logoDownloadUrl;
+      if (widget.existingMou == null && _pickedLogoFile != null) {
+        logoDownloadUrl = await mouService.uploadMouFile(
+          fileName: "logo_${DateTime.now().millisecondsSinceEpoch}_${_pickedLogoFile!.name}",
+          jenisMou: 'Bank',
+          fileBytes: _pickedLogoFile!.bytes,
+          filePath: _pickedLogoFile!.path,
+        );
+      }
+
+      // Simpan semua file ke Storage dan Firestore secara berurutan
+      for (int i = 0; i < _tempUploadedFiles.length; i++) {
+        final file = _tempUploadedFiles[i];
+        final pickedFile = _pickedFiles[i];
+
+        final downloadUrl = await mouService.uploadMouFile(
+          fileName: pickedFile.name,
+          jenisMou: 'Bank',
+          fileBytes: pickedFile.bytes,
+          filePath: pickedFile.path,
+        );
+
+        if (downloadUrl == null) {
+          throw Exception("Gagal mengunggah berkas ${pickedFile.name} ke Storage");
+        }
+
+        MouDocument docToPass;
+
+        if (i == 0 && widget.existingMou != null) {
+          await mouService.deleteMouFile(widget.existingMou!.fileMou);
+
+          final newStatus = widget.existingMou!.statusMou == 'Menunggu TTD' ? 'Aktif' : 'Draf';
+          docToPass = widget.existingMou!.copyWith(
+            fileMou: downloadUrl,
+            statusMou: newStatus,
+            fileName: pickedFile.name,
+            fileSize: file.fileSize,
+            tanggalUpload: DateTime.now(),
+            catatanRevisi: newStatus == 'Draf' ? null : widget.existingMou!.catatanRevisi,
+          );
+          await mouService.updateMou(docToPass);
+        } else {
+          final finalDoc = MouDocument(
+            idMou: '',
+            idBank: bankName,
+            jenisMou: 'Bank',
+            fileMou: downloadUrl,
+            tanggalUpload: DateTime.now(),
+            statusMou: 'Draf',
+            catatan: _notesController.text.trim().isNotEmpty ? _notesController.text.trim() : null,
+            createdAt: DateTime.now(),
+            title: file.title,
+            fileName: file.fileName,
+            fileSize: file.fileSize,
+            logoUrl: logoDownloadUrl,
+          );
+          final newId = await mouService.addMou(finalDoc);
+          docToPass = finalDoc.copyWith(idMou: newId ?? '');
+        }
+
+        if (i == _tempUploadedFiles.length - 1 && mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BrMouBankDetailScreen(mou: docToPass),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text("Gagal mengunggah berkas: $e"), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isUpdate = widget.existingMou != null;
+    final String pageTitle = isUpdate
+        ? (widget.existingMou!.statusMou == 'Menunggu TTD' ? "Unggah TTD Basah" : "Unggah Revisi")
+        : "Unggah Dokumen";
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: const CustomAppBar(
-        titleText: "Unggah Dokumen",
+      appBar: CustomAppBar(
+        titleText: pageTitle,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -152,57 +245,131 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Nama Bank Form Input
-            const Text(
-              "Nama Bank",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _bankNameController,
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFFEDF1F4),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
-                  borderSide: BorderSide.none,
+            if (isUpdate && widget.existingMou!.catatanRevisi != null) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade200),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                hintText: "Masukkan nama bank...",
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.feedback_outlined, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Catatan Revisi Legal",
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.existingMou!.catatanRevisi!,
+                      style: TextStyle(color: Colors.red.shade900, fontSize: 13, height: 1.4),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 24),
+            ],
 
-            // Prioritas Form Input
-            const Text(
-              "Prioritas",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedPriority,
-              items: const [
-                DropdownMenuItem(value: "Normal", child: Text("Normal")),
-                DropdownMenuItem(value: "Urgent", child: Text("Urgent")),
-              ],
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() {
-                    _selectedPriority = val;
-                  });
-                }
-              },
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: const Color(0xFFEDF1F4),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(28),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            // Hanya tampilkan form bank dan prioritas jika bukan upload TTD Basah
+            if (!(isUpdate && widget.existingMou!.statusMou == 'Menunggu TTD')) ...[
+              // Nama Bank Form Input
+              const Text(
+                "Nama Bank",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _bankNameController,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFFEDF1F4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  hintText: "Masukkan nama bank...",
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Prioritas Form Input
+              const Text(
+                "Prioritas",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _selectedPriority,
+                items: const [
+                  DropdownMenuItem(value: "Normal", child: Text("Normal")),
+                  DropdownMenuItem(value: "Urgent", child: Text("Urgent")),
+                ],
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() {
+                      _selectedPriority = val;
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: const Color(0xFFEDF1F4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(28),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Logo Picker
+              const Text(
+                "Logo Mitra (Opsional)",
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickLogoImage,
+                child: Container(
+                  height: 100,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDF1F4),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: _pickedLogoFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: _pickedLogoFile!.bytes != null 
+                              ? Image.memory(_pickedLogoFile!.bytes!, fit: BoxFit.cover)
+                              : Image.file(io.File(_pickedLogoFile!.path!), fit: BoxFit.cover),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined, color: Colors.grey.shade500, size: 32),
+                            const SizedBox(height: 8),
+                            Text("Pilih Logo", style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                          ],
+                        ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+            ],
 
             // Area Picker File
             GestureDetector(
@@ -351,22 +518,24 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
 
             const SizedBox(height: 20),
 
-            // Catatan Text Area
-            TextField(
-              controller: _notesController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: "Tuliskan poin-poin revisi secara mendetail di sini. Contoh: 'Pasal 4 Ayat 2 mengenai masa tenggang pembayaran perlu disesuaikan dengan kebijakan terbaru...'",
-                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12, height: 1.5),
-                filled: true,
-                fillColor: const Color(0xFFEDF1F4),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
+            // Catatan Text Area (Hanya jika bukan Menunggu TTD)
+            if (!(isUpdate && widget.existingMou!.statusMou == 'Menunggu TTD')) ...[
+              TextField(
+                controller: _notesController,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  hintText: "Tambahkan catatan...",
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12, height: 1.5),
+                  filled: true,
+                  fillColor: const Color(0xFFEDF1F4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.all(16),
                 ),
-                contentPadding: const EdgeInsets.all(16),
               ),
-            ),
+            ],
 
             const SizedBox(height: 24),
 
@@ -375,14 +544,23 @@ class _BrMouBankUploadScreenState extends State<BrMouBankUploadScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _ajukanUntukTinjauan,
+                onPressed: _isLoading ? null : _ajukanUntukTinjauan,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1F658A),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                   elevation: 0,
                 ),
-                child: const Text("Ajukan untuk Tinjauan", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(pageTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 60),

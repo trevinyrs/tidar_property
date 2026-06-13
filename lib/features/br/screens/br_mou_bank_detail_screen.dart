@@ -1,77 +1,211 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/services/mou_service.dart';
+import '../../../models/mou_model.dart';
 import '../../../widgets/custom_app_bar.dart';
+import 'br_mou_bank_upload_screen.dart';
 
 class BrMouBankDetailScreen extends StatelessWidget {
-  final String bankName;
+  final MouDocument mou;
 
-  const BrMouBankDetailScreen({super.key, required this.bankName});
+  const BrMouBankDetailScreen({super.key, required this.mou});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: const CustomAppBar(
-        titleText: "",
-        backgroundColor: Colors.transparent,
-      ),
-      extendBodyBehindAppBar: true,
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: kToolbarHeight + 40),
-            // Header Info
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "ID KASUS: #TDR-77421",
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Kemitraan Bank\n$bankName",
-                    style: const TextStyle(
-                      fontSize: 32,
-                      height: 1.1,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
+    return StreamBuilder<List<MouDocument>>(
+      initialData: [mou],
+      stream: Provider.of<MouService>(context, listen: false).getMousStream(),
+      builder: (context, snapshot) {
+        final mous = snapshot.data ?? [];
+        final currentMou = mous.firstWhere((m) => m.idMou == mou.idMou, orElse: () => mou);
+        final status = currentMou.statusMou;
+        final bankName = currentMou.idBank ?? "Bank Tanpa Nama";
+
+        // Logic for Dynamic Status
+        TimelineStatus drafStatus = TimelineStatus.pending;
+        TimelineStatus tinjauanStatus = TimelineStatus.pending;
+        TimelineStatus revisiStatus = TimelineStatus.pending;
+        TimelineStatus persetujuanStatus = TimelineStatus.pending;
+        TimelineStatus aktifStatus = TimelineStatus.pending;
+
+        if (status == 'Draf') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.active;
+        } else if (status == 'Menunggu TTD') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.completed;
+          persetujuanStatus = TimelineStatus.active;
+        } else if (status == 'Revisi') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.completed;
+          revisiStatus = TimelineStatus.active;
+        } else if (status == 'Aktif') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.completed;
+          revisiStatus = TimelineStatus.completed;
+          persetujuanStatus = TimelineStatus.completed;
+          aktifStatus = TimelineStatus.completed;
+        } else {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.active;
+        }
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
+          appBar: const CustomAppBar(
+            titleText: "",
+            backgroundColor: Colors.transparent,
+          ),
+          extendBodyBehindAppBar: true,
+          body: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: kToolbarHeight + 40),
+                // Header Info
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF1F658A),
-                          shape: BoxShape.circle,
+                      Text(
+                        currentMou.idMou.startsWith('mock') ? "ID KASUS: #TDR-77421" : "ID KASUS: #${currentMou.idMou.toUpperCase().substring(0, currentMou.idMou.length.clamp(0, 10))}",
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "Saat ini dalam Tinjauan Hukum",
-                        style: TextStyle(
-                          color: Color(0xFF1F658A),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                      const SizedBox(height: 8),
+                      Text(
+                        "Kemitraan Bank\n$bankName",
+                        style: const TextStyle(
+                          fontSize: 32,
+                          height: 1.1,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
                         ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1F658A),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Status Saat Ini: $status",
+                            style: const TextStyle(
+                              color: Color(0xFF1F658A),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+                ),
+                const SizedBox(height: 24),
+
+                // ── CONDITIONAL BANNER ──────────────────────────────────
+                if (status == 'Revisi' || status == 'Menunggu TTD')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: status == 'Revisi' ? const Color(0xFF1F658A) : Colors.orange.shade600,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (status == 'Revisi' ? const Color(0xFF1F658A) : Colors.orange).withValues(alpha: 0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(status == 'Revisi' ? Icons.warning_amber_rounded : Icons.edit_document, color: Colors.white, size: 24),
+                              const SizedBox(width: 10),
+                              Text(
+                                status == 'Revisi' ? "Tindakan Diperlukan" : "Menunggu TTD Basah",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            status == 'Revisi'
+                                ? "Anda perlu meninjau revisi dari departemen legal."
+                                : "MoU telah disetujui. Silakan unggah dokumen dengan Tanda Tangan Basah.",
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BrMouBankUploadScreen(
+                                      bankName: bankName,
+                                      existingMou: currentMou,
+                                    ),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: status == 'Revisi' ? const Color(0xFF1F658A) : Colors.orange.shade700,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    status == 'Revisi' ? "Tinjau Revisi Sekarang" : "Unggah TTD Basah",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(status == 'Revisi' ? Icons.arrow_forward_rounded : Icons.upload_file, size: 16),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
             // Timeline Card
             Container(
@@ -105,156 +239,44 @@ class BrMouBankDetailScreen extends StatelessWidget {
                     title: "Draf",
                     date: "12 Okt 2023",
                     description: "Lingkup perjanjian awal dan ketentuan ditetapkan oleh pimpinan proyek.",
-                    status: TimelineStatus.completed,
+                    status: drafStatus,
                     icon: Icons.check,
                   ),
                   _buildTimelineStep(
-                    title: "Tinjauan Hukum",
-                    description: "Tim hukum internal sedang meninjau klausul 4.2 dan 5.7 terkait kewajiban.",
-                    status: TimelineStatus.active,
+                    title: "Menunggu Tinjauan Tim Legal",
+                    description: "Tim legal sedang melakukan peninjauan draf",
+                    status: tinjauanStatus,
                     icon: Icons.gavel,
-                    badgeText: "SEDANG BERJALAN",
-                    subtitleWidget: Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Row(
-                        children: [
-                          const CircleAvatar(
-                            radius: 10,
-                            backgroundImage: NetworkImage('https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=120'),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              "Ditugaskan ke Sarah Jenkins (Penasihat Hukum)",
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade600,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   _buildTimelineStep(
                     title: "Revisi",
                     description: "Implementasi umpan balik hukum dan penawaran balik mitra.",
-                    status: TimelineStatus.pending,
+                    status: revisiStatus,
                     icon: Icons.history,
                   ),
                   _buildTimelineStep(
                     title: "Persetujuan",
                     description: "Persetujuan akhir dari Dewan Eksekutif dan Direktur Bank.",
-                    status: TimelineStatus.pending,
+                    status: persetujuanStatus,
                     icon: Icons.assignment_turned_in_outlined,
                   ),
                   _buildTimelineStep(
                     title: "Aktif",
                     description: "Perjanjian berlaku di semua cabang regional.",
-                    status: TimelineStatus.pending,
+                    status: aktifStatus,
                     icon: Icons.rocket_launch_outlined,
-                  ),
-                  _buildTimelineStep(
-                    title: "Kadaluarsa",
-                    description: "Dijadwalkan untuk evaluasi perpanjangan pada Okt 2025.",
-                    status: TimelineStatus.pending,
-                    icon: Icons.update_disabled_outlined,
                     isLast: true,
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 24),
-
-            // Ringkasan Status Saat Ini
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1F658A), Color(0xFF154863)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF1F658A).withOpacity(0.2),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  )
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        "Ringkasan Status Saat Ini",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Icon(
-                        Icons.account_balance,
-                        color: Colors.white.withOpacity(0.3),
-                        size: 24,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    "INSTITUSI MITRA",
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "$bankName (Persero) Tbk.",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    height: 1,
-                    color: Colors.white24,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInfoItem("EST. DURASI", "24 Bulan"),
-                      ),
-                      Expanded(
-                        child: _buildInfoItem(
-                          "PRIORITAS",
-                          "Kritis",
-                          color: const Color(0xFFFF8A80),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 48),
           ],
         ),
       ),
     );
+  },
+);
   }
 
   Widget _buildTimelineStep({

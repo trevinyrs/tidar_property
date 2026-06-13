@@ -16,6 +16,13 @@ class BrMouBankScreen extends StatefulWidget {
 class _BrMouBankScreenState extends State<BrMouBankScreen> {
   String _searchQuery = "";
   String _selectedFilter = "All";
+  late Stream<List<MouDocument>> _mousStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _mousStream = Provider.of<MouService>(context, listen: false).getMousStream();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,123 +75,153 @@ class _BrMouBankScreenState extends State<BrMouBankScreen> {
 
             const SizedBox(height: 20),
 
-            // Statistics Realtime (MOU AKTIF, DALAM PROSES, MOU EXP)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  _buildRealtimeStatCard(context, "MOU AKTIF", "Aktif", const Color(0xFF1F658A)),
-                  const SizedBox(width: 12),
-                  _buildRealtimeStatCard(context, "DALAM PROSES", "Draf", Colors.orange),
-                  const SizedBox(width: 12),
-                  _buildRealtimeStatCard(context, "MOU EXP", "Kadaluarsa", Colors.red),
-                ],
-              ),
-            ),
+            // Main StreamBuilder wrapping stats and list to avoid flicker
+            StreamBuilder<List<MouDocument>>(
+              stream: _mousStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: CircularProgressIndicator(),
+                  ));
+                }
+                final mous = snapshot.data ?? [];
+                final bankMous = mous.where((m) => m.jenisMou == 'Bank').toList();
 
-            const SizedBox(height: 20),
-
-            // Search Bar & Filter Chips
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val.trim().toLowerCase();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: "Search by bank name...",
-                        hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(28),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    // Statistics Realtime (MOU AKTIF, DALAM PROSES)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          _buildRealtimeStatCard("MOU AKTIF", const Color(0xFF1F658A), bankMous),
+                          const SizedBox(width: 12),
+                          _buildRealtimeStatCard("DALAM PROSES", Colors.orange, bankMous),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildFilterChip("All"),
-                        const SizedBox(width: 8),
-                        _buildFilterChip("Active"),
-                        const SizedBox(width: 8),
-                        _buildFilterChip("In Process"),
-                      ],
+
+                    const SizedBox(height: 20),
+
+                    // Search Bar & Filter Chips
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Column(
+                          children: [
+                            TextField(
+                              onChanged: (val) {
+                                setState(() {
+                                  _searchQuery = val.trim().toLowerCase();
+                                });
+                              },
+                              decoration: InputDecoration(
+                                hintText: "Search by bank name...",
+                                hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: [
+                                  _buildFilterChip("All"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Active"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Draf"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("In Proces"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Revisi"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Menunggu TTD"),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
+
+                    // Bank List
+                    if (bankMous.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Center(
+                          child: Text(
+                            "Belum ada berkas MoU Bank terdaftar.",
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+                        ),
+                      )
+                    else
+                      ...bankMous.map((mou) {
+                        final status = mou.statusMou.toUpperCase();
+                        Color statusColor;
+                        if (status == 'AKTIF') {
+                          statusColor = Colors.green;
+                        } else if (status == 'REVISI') {
+                          statusColor = Colors.red;
+                        } else if (status == 'MENUNGGU TTD') {
+                          statusColor = Colors.orange;
+                        } else {
+                          statusColor = const Color(0xFF96D3FD); // Draf / Process
+                        }
+
+                        return _buildBankItem(
+                          context: context,
+                          logoWidget: mou.logoUrl != null && mou.logoUrl!.isNotEmpty
+                              ? Image.network(
+                                  mou.logoUrl!,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                )
+                              : Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: const Color(0xFF0F4C81),
+                                  child: Center(
+                                    child: Text(
+                                      mou.idBank != null && mou.idBank!.isNotEmpty ? mou.idBank![0].toUpperCase() : "B",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                          bankName: mou.idBank ?? "Bank Tanpa Nama",
+                          description: mou.catatan ?? "Kemitraan strategis untuk penyediaan KPR dan fasilitas pembiayaan.",
+                          status: status,
+                          statusColor: statusColor,
+                          validText: "DRAF DIUNGGAH\n${mou.fileName}",
+                          mou: mou,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BrMouBankDetailScreen(mou: mou),
+                              ),
+                            );
+                          },
+                        );
+                      }),
                   ],
-                ),
-              ),
-            ),
-
-            // Bank List
-            _buildBankItem(
-              context: context,
-              logoWidget: Container(
-                width: 50,
-                height: 50,
-                color: const Color(0xFF0F4C81),
-                child: const Center(child: Text("Bank", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
-              ),
-              bankName: "Global Standard Bank",
-              description: "Strategic partnership for premium mortgage financing and liquidity management.",
-              status: "ACTIVE",
-              statusColor: Colors.green,
-              validText: "VALID UNTIL\nOct 12, 2026",
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const BrMouBankDetailScreen(bankName: "Global Standard Bank")),
-                );
-              },
-            ),
-
-            _buildBankItem(
-              context: context,
-              logoWidget: Container(
-                width: 50,
-                height: 50,
-                color: const Color(0xFF1B2C3F),
-                child: const Center(child: Text("Finance", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
-              ),
-              bankName: "Lumina Finance",
-              description: "Awaiting final verification of digital lending protocols and risk assessment.",
-              status: "PROCESS",
-              statusColor: const Color(0xFF96D3FD),
-              validText: "UPDATED\nYesterday, 14:20",
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const BrMouBankDetailScreen(bankName: "Lumina Finance")),
-                );
-              },
-            ),
-
-            _buildBankItem(
-              context: context,
-              logoWidget: Container(
-                width: 50,
-                height: 50,
-                color: const Color(0xFF34495E),
-                child: const Center(child: Text("BRI", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
-              ),
-              bankName: "Bank Mandiri (Persero)",
-              description: "Commercial real estate development financing partner for metropolitan projects.",
-              status: "EXPIRED",
-              statusColor: Colors.grey,
-              validText: "EXPIRED\nOct 12, 2025",
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const BrMouBankDetailScreen(bankName: "Bank Mandiri (Persero)")),
                 );
               },
             ),
@@ -230,13 +267,22 @@ class _BrMouBankScreenState extends State<BrMouBankScreen> {
     required String status,
     required Color statusColor,
     required String validText,
+    required MouDocument mou,
     required VoidCallback onTap,
   }) {
     if (_searchQuery.isNotEmpty && !bankName.toLowerCase().contains(_searchQuery)) {
       return const SizedBox.shrink();
     }
-    if (_selectedFilter == "Active" && status != "ACTIVE") return const SizedBox.shrink();
-    if (_selectedFilter == "In Process" && status != "PROCESS") return const SizedBox.shrink();
+    
+    // Filtering logic
+    if (_selectedFilter != "All") {
+      final s = status.toUpperCase();
+      if (_selectedFilter == "Active" && s != "AKTIF") return const SizedBox.shrink();
+      if (_selectedFilter == "Draf" && s != "DRAF") return const SizedBox.shrink();
+      if (_selectedFilter == "In Proces" && s != "DRAF") return const SizedBox.shrink(); // Assuming Draf is In Proces
+      if (_selectedFilter == "Revisi" && s != "REVISI") return const SizedBox.shrink();
+      if (_selectedFilter == "Menunggu TTD" && s != "MENUNGGU TTD") return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -266,21 +312,63 @@ class _BrMouBankScreenState extends State<BrMouBankScreen> {
                       borderRadius: BorderRadius.circular(12),
                       child: logoWidget,
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: statusColor == Colors.grey ? Colors.grey.shade700 : statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          letterSpacing: 0.5,
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              color: statusColor == Colors.grey ? Colors.grey.shade700 : statusColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text("Hapus MoU"),
+                                content: const Text("Apakah Anda yakin ingin menghapus dokumen MoU ini? Tindakan ini tidak dapat dibatalkan dan file akan dihapus."),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text("Batal"),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      final mouService = Provider.of<MouService>(context, listen: false);
+                                      // Hapus file
+                                      await mouService.deleteMouFile(mou.fileMou);
+                                      // Hapus dokumen di database
+                                      await mouService.deleteMou(mou.idMou);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("MoU berhasil dihapus")),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                    child: const Text("Hapus", style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -300,20 +388,25 @@ class _BrMouBankScreenState extends State<BrMouBankScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          validText.split('\n').first,
-                          style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          validText.split('\n').last,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
-                        ),
-                      ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            validText.split('\n').first,
+                            style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            validText.split('\n').last,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: const BoxDecoration(
@@ -332,44 +425,40 @@ class _BrMouBankScreenState extends State<BrMouBankScreen> {
     );
   }
 
-  Widget _buildRealtimeStatCard(BuildContext context, String title, String statusName, Color color) {
-    return Expanded(
-      child: StreamBuilder<List<MouDocument>>(
-        stream: Provider.of<MouService>(context, listen: false)
-            .getMousByTypeAndStatusStream('Bank', statusName),
-        builder: (context, snapshot) {
-          final count = snapshot.data?.length ?? 0;
-          String countText = count < 10 ? "0$count" : "$count";
-          if (title == "MOU AKTIF" && count == 0) countText = "12"; // Fallback static data mock
-          if (title == "DALAM PROSES" && count == 0) countText = "04";
-          if (title == "MOU EXP" && count == 0) countText = "02";
+  Widget _buildRealtimeStatCard(String title, Color color, List<MouDocument> mous) {
+    int count = 0;
+    if (title == "MOU AKTIF") {
+      count = mous.where((m) => m.statusMou.toUpperCase() == 'AKTIF').length;
+    } else if (title == "DALAM PROSES") {
+      count = mous.where((m) => m.statusMou.toUpperCase() != 'AKTIF').length;
+    }
+    String countText = count < 10 ? "0$count" : "$count";
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  countText,
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              countText,
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

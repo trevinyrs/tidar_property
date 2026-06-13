@@ -12,6 +12,8 @@ class MouDocument {
   final String statusMou; // Terbatas pada: ["Draf", "Revisi", "Menunggu TTD", "Aktif"]
   final String? catatanRevisi;
   final String? catatan;
+  final String? namaPrincipal;
+  final String? logoUrl;
   final DateTime createdAt;
 
   // Properti tambahan untuk kompatibilitas UI lama (jika ada)
@@ -30,6 +32,8 @@ class MouDocument {
     required this.statusMou,
     this.catatanRevisi,
     this.catatan,
+    this.namaPrincipal,
+    this.logoUrl,
     required this.createdAt,
     
     // Opsional untuk kompatibilitas
@@ -69,6 +73,8 @@ class MouDocument {
       statusMou: data['status_mou'] ?? data['status'] ?? 'Draf',
       catatanRevisi: data['catatan_revisi'],
       catatan: data['catatan'],
+      namaPrincipal: data['nama_principal'],
+      logoUrl: data['logo_url'],
       createdAt: (data['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
       
       title: data['title'] ?? data['fileName'] ?? '',
@@ -88,6 +94,8 @@ class MouDocument {
       'status_mou': statusMou,
       'catatan_revisi': catatanRevisi,
       'catatan': catatan,
+      'nama_principal': namaPrincipal,
+      'logo_url': logoUrl,
       'created_at': Timestamp.fromDate(createdAt),
       
       'title': title,
@@ -109,6 +117,8 @@ class MouDocument {
       statusMou: map['status_mou'] ?? map['status'] ?? 'Draf',
       catatanRevisi: map['catatan_revisi'],
       catatan: map['catatan'],
+      namaPrincipal: map['nama_principal'],
+      logoUrl: map['logo_url'],
       createdAt: (map['created_at'] as Timestamp?)?.toDate() ?? DateTime.now(),
       
       title: map['title'] ?? map['fileName'] ?? '',
@@ -126,4 +136,42 @@ class MouDocument {
   String get type => jenisMou;
   String get status => statusMou;
   String get uploadedAt => tanggalUpload.toIso8601String();
+
+  MouDocument copyWith({
+    String? idMou,
+    String? idAgent,
+    String? idBank,
+    String? jenisMou,
+    String? fileMou,
+    String? fileMouFinal,
+    DateTime? tanggalUpload,
+    String? statusMou,
+    String? catatanRevisi,
+    String? catatan,
+    String? namaPrincipal,
+    String? logoUrl,
+    DateTime? createdAt,
+    String? title,
+    String? fileName,
+    String? fileSize,
+  }) {
+    return MouDocument(
+      idMou: idMou ?? this.idMou,
+      idAgent: idAgent ?? this.idAgent,
+      idBank: idBank ?? this.idBank,
+      jenisMou: jenisMou ?? this.jenisMou,
+      fileMou: fileMou ?? this.fileMou,
+      fileMouFinal: fileMouFinal ?? this.fileMouFinal,
+      tanggalUpload: tanggalUpload ?? this.tanggalUpload,
+      statusMou: statusMou ?? this.statusMou,
+      catatanRevisi: catatanRevisi ?? this.catatanRevisi,
+      catatan: catatan ?? this.catatan,
+      namaPrincipal: namaPrincipal ?? this.namaPrincipal,
+      logoUrl: logoUrl ?? this.logoUrl,
+      createdAt: createdAt ?? this.createdAt,
+      title: title ?? this.title,
+      fileName: fileName ?? this.fileName,
+      fileSize: fileSize ?? this.fileSize,
+    );
+  }
 }

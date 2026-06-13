@@ -28,7 +28,7 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
   void _showRevisionDialog(BuildContext context, String currentUserId) {
     showDialog(
       context: context,
-      builder: (context) {
+      builder: (dialogContext) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text("Masukkan Catatan Revisi"),
@@ -48,7 +48,7 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text("Batal", style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
@@ -56,11 +56,14 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
                 final catatan = _revisionController.text.trim();
                 if (catatan.isEmpty) return;
 
-                Navigator.pop(context); // Close dialog
+                Navigator.pop(dialogContext); // Close dialog
 
                 setState(() => _isProcessing = true);
 
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
                 final mouService = Provider.of<MouService>(context, listen: false);
+
                 bool success = await mouService.submitRevision(
                   idMou: widget.mou.idMou,
                   idUser: currentUserId,
@@ -71,12 +74,12 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
                 setState(() => _isProcessing = false);
 
                 if (success) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(content: Text("Catatan revisi berhasil dikirim!"), backgroundColor: Colors.green),
                   );
-                  Navigator.pop(context); // Go back
+                  navigator.pop(); // Go back
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(content: Text("Gagal mengirim revisi. Coba lagi."), backgroundColor: Colors.red),
                   );
                 }
@@ -96,19 +99,23 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
 
   // Aksi B: Setujui & Teruskan
   void _approveDocument(BuildContext context, String currentUserId) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final mouService = Provider.of<MouService>(context, listen: false);
+
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text("Setujui Dokumen?"),
         content: const Text("Apakah Anda yakin ingin menyetujui dokumen MoU ini dan meneruskannya ke tahap penandatanganan?"),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text("Batal", style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.primary,
               foregroundColor: Colors.white,
@@ -124,7 +131,6 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
 
     setState(() => _isProcessing = true);
 
-    final mouService = Provider.of<MouService>(context, listen: false);
     bool success = await mouService.approveAndForward(
       idMou: widget.mou.idMou,
       idUser: currentUserId,
@@ -134,12 +140,12 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
     setState(() => _isProcessing = false);
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text("MoU berhasil disetujui & diteruskan!"), backgroundColor: Colors.green),
       );
-      Navigator.pop(context);
+      navigator.pop();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text("Gagal menyetujui dokumen. Coba lagi."), backgroundColor: Colors.red),
       );
     }
@@ -147,12 +153,12 @@ class _MouLegalReviewDetailScreenState extends State<MouLegalReviewDetailScreen>
 
   // Buka Pratinjau PDF / Download manual
   void _downloadAndReviewDocument(BuildContext context) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final Uri url = Uri.parse(widget.mou.fileMou);
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         const SnackBar(content: Text("Gagal membuka link dokumen"), backgroundColor: Colors.red),
       );
     }

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'br_mou_agent_upload_screen.dart';
 import 'mou_tracking_detail_screen.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/mou_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/mou_model.dart';
 import '../../../widgets/custom_app_bar.dart';
@@ -17,6 +18,13 @@ class BrMouAgentScreen extends StatefulWidget {
 class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
   String _searchQuery = "";
   String _selectedFilter = "All";
+  late Stream<List<MouDocument>> _mousStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _mousStream = Provider.of<MouService>(context, listen: false).getMousStream();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,90 +83,127 @@ class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
 
             const SizedBox(height: 20),
 
-            // Statistics Realtime (TOTAL AGENT, AKTIF, KADALUARSA)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  _buildRealtimeStatCard(context, "TOTAL AGENT", null, const Color(0xFF1F658A)),
-                  const SizedBox(width: 12),
-                  _buildRealtimeStatCard(context, "AKTIF", "Aktif", Colors.green),
-                  const SizedBox(width: 12),
-                  _buildRealtimeStatCard(context, "KADALUARSA", "Expired", Colors.red),
-                ],
-              ),
-            ),
+            // Main StreamBuilder wrapping stats and list to avoid flicker
+            StreamBuilder<List<MouDocument>>(
+              stream: _mousStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: CircularProgressIndicator(),
+                  ));
+                }
+                final mous = snapshot.data ?? [];
+                final agentMous = mous.where((m) => m.jenisMou == 'Agent').toList();
 
-            const SizedBox(height: 20),
-
-            // Search Bar & Filter Chips
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextField(
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val.trim().toLowerCase();
-                        });
-                      },
-                      decoration: InputDecoration(
-                        hintText: "Search by agent name...",
-                        hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(28),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                    // Statistics Realtime (MOU AKTIF, DALAM PROSES)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          _buildRealtimeStatCard("MOU AKTIF", const Color(0xFF1F658A), agentMous),
+                          const SizedBox(width: 12),
+                          _buildRealtimeStatCard("DALAM PROSES", Colors.orange, agentMous),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        _buildFilterChip("All"),
-                        const SizedBox(width: 8),
-                        _buildFilterChip("Active"),
-                        const SizedBox(width: 8),
-                        _buildFilterChip("Expired"),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
 
-            // Mock Data or Realtime List matching mockup 1
-            _buildAgentItem(
-              context: context,
-              iconData: Icons.home_work_outlined,
-              name: "Andi Wijaya",
-              company: "Ray White Menteng",
-              status: "AKTIF",
-              statusColor: Colors.blue.shade600,
-              footerText: "Aktif sejak 12 Jun 2024",
-            ),
-            _buildAgentItem(
-              context: context,
-              iconData: Icons.handshake_outlined,
-              name: "Siska Pratama",
-              company: "Century 21 Unity",
-              status: "PROSES",
-              statusColor: Colors.purple.shade400,
-              footerText: "Pengajuan 02 Mar 2024",
-            ),
-            _buildAgentItem(
-              context: context,
-              iconData: Icons.history,
-              name: "Bambang Susanto",
-              company: "Independent Broker",
-              status: "KADALUARSA",
-              statusColor: Colors.red.shade400,
-              footerText: "Berakhir 28 Feb 2024",
+                    const SizedBox(height: 20),
+
+                    // Search Bar & Filter Chips
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Column(
+                          children: [
+                            TextField(
+                              onChanged: (val) {
+                                setState(() {
+                                  _searchQuery = val.trim().toLowerCase();
+                                });
+                              },
+                              decoration: InputDecoration(
+                                hintText: "Search by agent name...",
+                                hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+                                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(28),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: [
+                                  _buildFilterChip("All"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Active"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Draf"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("In Proces"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Revisi"),
+                                  const SizedBox(width: 8),
+                                  _buildFilterChip("Menunggu TTD"),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Agent List
+                    if (agentMous.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(32.0),
+                        child: Center(
+                          child: Text(
+                            "Belum ada berkas MoU Agent terdaftar.",
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+                        ),
+                      )
+
+                    else
+                      ...agentMous.map((mou) {
+                        final status = mou.statusMou.toUpperCase();
+                        Color statusColor;
+                        if (status == 'AKTIF') {
+                          statusColor = Colors.blue.shade600;
+                        } else if (status == 'REVISI') {
+                          statusColor = Colors.red.shade400;
+                        } else if (status == 'MENUNGGU TTD') {
+                          statusColor = Colors.orange;
+                        } else {
+                          statusColor = Colors.purple.shade400; // Proses / Draf
+                        }
+
+                        return _buildAgentItem(
+                          context: context,
+                          mou: mou,
+                          iconData: Icons.home_work_outlined,
+                          name: mou.idAgent ?? "Agen Tanpa Nama",
+                          company: "Ray White Menteng",
+                          status: status,
+                          statusColor: statusColor,
+                          footerText: "Diunggah baru saja • ${mou.fileName}",
+                        );
+                      }),
+                  ],
+                );
+              },
             ),
 
             const SizedBox(height: 120),
@@ -196,6 +241,7 @@ class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
 
   Widget _buildAgentItem({
     required BuildContext context,
+    required MouDocument mou,
     required IconData iconData,
     required String name,
     required String company,
@@ -206,32 +252,26 @@ class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
     if (_searchQuery.isNotEmpty && !name.toLowerCase().contains(_searchQuery)) {
       return const SizedBox.shrink();
     }
-    if (_selectedFilter == "Active" && status != "AKTIF") return const SizedBox.shrink();
-    if (_selectedFilter == "Expired" && status != "KADALUARSA") return const SizedBox.shrink();
+    
+    // Filtering logic based on requested filters
+    if (_selectedFilter != "All") {
+      final s = status.toUpperCase();
+      if (_selectedFilter == "Active" && s != "AKTIF") return const SizedBox.shrink();
+      if (_selectedFilter == "Draf" && s != "DRAF") return const SizedBox.shrink();
+      if (_selectedFilter == "In Proces" && s != "DRAF") return const SizedBox.shrink(); // Assuming Draf is In Proces
+      if (_selectedFilter == "Revisi" && s != "REVISI") return const SizedBox.shrink();
+      if (_selectedFilter == "Menunggu TTD" && s != "MENUNGGU TTD") return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: GestureDetector(
         onTap: () {
-          final mockMou = MouDocument(
-            idMou: 'mock_mou_${name.replaceAll(' ', '_')}',
-            idAgent: name,
-            jenisMou: 'Agent',
-            fileMou: 'MoU_Kemitraan_Agent.pdf',
-            tanggalUpload: DateTime.now().subtract(const Duration(days: 1)),
-            statusMou: status == 'PROSES' ? 'Revisi' : (status == 'AKTIF' ? 'Aktif' : 'Draf'),
-            catatanRevisi: status == 'PROSES' ? 'Mohon perhatikan pasal 4 ayat 2 mengenai terminasi dini.' : null,
-            createdAt: DateTime.now().subtract(const Duration(days: 1)),
-            title: 'MoU_Kemitraan_Agent',
-            fileName: 'MoU_Kemitraan_Agent.pdf',
-            fileSize: '2.4 MB',
-          );
-
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => MouTrackingDetailScreen(
-                mou: mockMou,
+                mou: mou,
                 agentName: name,
                 company: company,
               ),
@@ -258,29 +298,81 @@ class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(iconData, color: statusColor, size: 24),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          letterSpacing: 0.5,
+                    mou.logoUrl != null && mou.logoUrl!.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.network(
+                              mou.logoUrl!,
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: statusColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(iconData, color: statusColor, size: 24),
+                          ),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            status,
+                            style: TextStyle(
+                              color: statusColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                title: const Text("Hapus MoU"),
+                                content: const Text("Apakah Anda yakin ingin menghapus dokumen MoU ini? Tindakan ini tidak dapat dibatalkan dan file akan dihapus."),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text("Batal"),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      final mouService = Provider.of<MouService>(context, listen: false);
+                                      // Hapus file
+                                      await mouService.deleteMouFile(mou.fileMou);
+                                      // Hapus dokumen di database
+                                      await mouService.deleteMou(mou.idMou);
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text("MoU berhasil dihapus")),
+                                        );
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                    child: const Text("Hapus", style: TextStyle(color: Colors.white)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -300,10 +392,15 @@ class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      footerText,
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                    Expanded(
+                      child: Text(
+                        footerText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.all(6),
                       decoration: const BoxDecoration(
@@ -322,60 +419,40 @@ class _BrMouAgentScreenState extends State<BrMouAgentScreen> {
     );
   }
 
-  Widget _buildRealtimeStatCard(
-    BuildContext context,
-    String title,
-    String? statusFilter,
-    Color color, {
-    bool hasLeftBorder = false,
-  }) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final Stream<int> countStream = authService.getUsersStream(roleFilter: 'Agent').map((list) {
-      if (statusFilter != null) {
-        return list.where((u) => u.status.toLowerCase() == statusFilter.toLowerCase()).length;
-      }
-      return list.length;
-    });
+  Widget _buildRealtimeStatCard(String title, Color color, List<MouDocument> mous) {
+    int count = 0;
+    if (title == "MOU AKTIF") {
+      count = mous.where((m) => m.statusMou.toUpperCase() == 'AKTIF').length;
+    } else if (title == "DALAM PROSES") {
+      count = mous.where((m) => m.statusMou.toUpperCase() != 'AKTIF').length;
+    }
+    String countText = count < 10 ? "0$count" : "$count";
 
     return Expanded(
-      child: StreamBuilder<int>(
-        stream: countStream,
-        builder: (context, snapshot) {
-          final count = snapshot.data ?? 0;
-          String countText = count.toString();
-          if (title == "TOTAL AGENT" && count == 0) countText = "128";
-          if (title == "AKTIF" && count == 0) countText = "112";
-          if (title == "KADALUARSA" && count == 0) countText = "4";
-
-          return Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: hasLeftBorder
-                  ? const Border(left: BorderSide(color: Color(0xFF1F658A), width: 4))
-                  : null,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  countText,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              countText,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }

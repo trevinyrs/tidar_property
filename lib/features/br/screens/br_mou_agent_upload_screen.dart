@@ -1,3 +1,4 @@
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
@@ -9,11 +10,13 @@ import '../../../widgets/custom_app_bar.dart';
 class BrMouAgentUploadScreen extends StatefulWidget {
   final String agentName;
   final String company;
+  final MouDocument? existingMou;
 
   const BrMouAgentUploadScreen({
     super.key,
     required this.agentName,
     required this.company,
+    this.existingMou,
   });
 
   @override
@@ -22,64 +25,49 @@ class BrMouAgentUploadScreen extends StatefulWidget {
 
 class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
   List<MouDocument> _tempUploadedFiles = [];
+  List<PlatformFile> _pickedFiles = [];
+  PlatformFile? _pickedLogoFile;
+  bool _isLoading = false;
+
+  late final TextEditingController _agentNameController;
+  late final TextEditingController _principalNameController;
 
   @override
   void initState() {
     super.initState();
-    // Pre-populate with mockup files if empty
-    _tempUploadedFiles = [
-      MouDocument(
-        idMou: 'mock_1',
-        idAgent: widget.agentName,
-        jenisMou: 'Agent',
-        fileMou: 'MoU_Apartment_CentralPark.pdf',
-        tanggalUpload: DateTime.now().subtract(const Duration(days: 1)),
-        statusMou: 'Draf',
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        title: 'MoU_Apartment_CentralPark',
-        fileName: 'MoU_Apartment_CentralPark.pdf',
-        fileSize: '2.4 MB',
-      ),
-      MouDocument(
-        idMou: 'mock_2',
-        idAgent: widget.agentName,
-        jenisMou: 'Agent',
-        fileMou: 'Draft_Sewa_Ruko_Sudirman.docx',
-        tanggalUpload: DateTime.now().subtract(const Duration(days: 1)),
-        statusMou: 'Draf',
-        createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        title: 'Draft_Sewa_Ruko_Sudirman',
-        fileName: 'Draft_Sewa_Ruko_Sudirman.docx',
-        fileSize: '840 KB',
-      ),
-      MouDocument(
-        idMou: 'mock_3',
-        idAgent: widget.agentName,
-        jenisMou: 'Agent',
-        fileMou: 'Lampiran_Denah_Unit.jpg',
-        tanggalUpload: DateTime.now().subtract(const Duration(days: 2)),
-        statusMou: 'Draf',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-        title: 'Lampiran_Denah_Unit',
-        fileName: 'Lampiran_Denah_Unit.jpg',
-        fileSize: '4.1 MB',
-      ),
-    ];
+    // Berkas kosong secara default agar aplikasi dinamis menggunakan berkas nyata
+    _tempUploadedFiles = [];
+    _agentNameController = TextEditingController(
+      text: widget.existingMou?.idAgent ?? (widget.agentName == "Andi Wijaya" ? "" : widget.agentName)
+    );
+    _principalNameController = TextEditingController(
+      text: widget.existingMou?.namaPrincipal ?? ""
+    );
+  }
+
+  @override
+  void dispose() {
+    _agentNameController.dispose();
+    _principalNameController.dispose();
+    super.dispose();
   }
 
   Future<void> _pickAndUploadFile() async {
+    if (_isLoading) return;
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'docx', 'doc', 'jpg', 'png'],
         allowMultiple: true,
+        withData: true,
       );
 
       if (result != null) {
         setState(() {
           for (var file in result.files) {
+            _pickedFiles.add(file);
             final mou = MouDocument(
-              idMou: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+              idMou: 'temp_${DateTime.now().millisecondsSinceEpoch}_${file.name}',
               idAgent: widget.agentName,
               jenisMou: 'Agent',
               fileMou: file.name,
@@ -115,13 +103,36 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
     }
   }
 
+  Future<void> _pickLogoImage() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result != null) {
+        setState(() {
+          _pickedLogoFile = result.files.first;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Gagal memilih logo: $e"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   void _deleteFile(int index) {
+    if (_isLoading) return;
     setState(() {
       _tempUploadedFiles.removeAt(index);
+      _pickedFiles.removeAt(index);
     });
   }
 
   Future<void> _submitForReview() async {
+    if (_isLoading) return;
     final mouService = Provider.of<MouService>(context, listen: false);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
@@ -132,41 +143,105 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
       return;
     }
 
-    // Save all to Firestore
-    for (var file in _tempUploadedFiles) {
-      final finalDoc = MouDocument(
-        idMou: '',
-        idAgent: widget.agentName,
-        jenisMou: 'Agent',
-        fileMou: file.fileName,
-        tanggalUpload: DateTime.now(),
-        statusMou: 'Draf',
-        createdAt: DateTime.now(),
-        title: file.title,
-        fileName: file.fileName,
-        fileSize: file.fileSize,
+    if (widget.existingMou == null && (_agentNameController.text.trim().isEmpty || _principalNameController.text.trim().isEmpty)) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(content: Text("Nama Agent dan Nama Principal wajib diisi"), backgroundColor: Colors.red),
       );
-      await mouService.addMou(finalDoc);
+      return;
     }
 
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BrMouAgentDetailScreen(
-          agentName: widget.agentName,
-          company: widget.company,
+    setState(() => _isLoading = true);
+
+    try {
+      String? logoDownloadUrl;
+      if (widget.existingMou == null && _pickedLogoFile != null) {
+        logoDownloadUrl = await mouService.uploadMouFile(
+          fileName: "logo_${DateTime.now().millisecondsSinceEpoch}_${_pickedLogoFile!.name}",
+          jenisMou: 'Agent', // Store in same bucket
+          fileBytes: _pickedLogoFile!.bytes,
+          filePath: _pickedLogoFile!.path,
+        );
+      }
+
+      // Simpan semua ke Storage dan Firestore secara berurutan
+      for (int i = 0; i < _tempUploadedFiles.length; i++) {
+        final file = _tempUploadedFiles[i];
+        final pickedFile = _pickedFiles[i];
+
+        final downloadUrl = await mouService.uploadMouFile(
+          fileName: pickedFile.name,
+          jenisMou: 'Agent',
+          fileBytes: pickedFile.bytes,
+          filePath: pickedFile.path,
+        );
+
+        if (downloadUrl == null) {
+          throw Exception("Gagal mengunggah berkas ${pickedFile.name} ke Storage");
+        }
+
+        if (i == 0 && widget.existingMou != null) {
+          // Edit/Re-upload mode untuk file pertama
+          await mouService.deleteMouFile(widget.existingMou!.fileMou);
+
+          final newStatus = widget.existingMou!.statusMou == 'Menunggu TTD' ? 'Aktif' : 'Draf';
+          final updatedDoc = widget.existingMou!.copyWith(
+            fileMou: downloadUrl,
+            statusMou: newStatus,
+            fileName: pickedFile.name,
+            fileSize: file.fileSize,
+            tanggalUpload: DateTime.now(), // update tanggal revisi
+            catatanRevisi: newStatus == 'Draf' ? null : widget.existingMou!.catatanRevisi,
+          );
+          await mouService.updateMou(updatedDoc);
+        } else {
+          // Create mode
+          final finalDoc = MouDocument(
+            idMou: '',
+            idAgent: _agentNameController.text.trim(),
+            namaPrincipal: _principalNameController.text.trim(),
+            jenisMou: 'Agent',
+            fileMou: downloadUrl, 
+            tanggalUpload: DateTime.now(),
+            statusMou: 'Draf',
+            createdAt: DateTime.now(),
+            title: file.title,
+            fileName: file.fileName,
+            fileSize: file.fileSize,
+            logoUrl: logoDownloadUrl,
+          );
+          await mouService.addMou(finalDoc);
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BrMouAgentDetailScreen(
+            agentName: widget.agentName,
+            company: widget.company,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text("Gagal mengunggah berkas: $e"), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isUpdate = widget.existingMou != null;
+    final String pageTitle = isUpdate
+        ? (widget.existingMou!.statusMou == 'Menunggu TTD' ? "Unggah TTD Basah" : "Unggah Revisi")
+        : "Unggah Dokumen MoU";
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: const CustomAppBar(
-        titleText: "Unggah Dokumen MoU",
+      appBar: CustomAppBar(
+        titleText: pageTitle,
       ),
       body: SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
@@ -178,8 +253,131 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
               "Kelola berkas perjanjian dengan integritas struktural. Pastikan dokumen dalam format PDF atau DOCX untuk proses tinjauan yang optimal.",
               style: TextStyle(fontSize: 14, color: Colors.grey, height: 1.5),
             ),
-
             const SizedBox(height: 24),
+
+            if (isUpdate && widget.existingMou!.catatanRevisi != null) ...[
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.feedback_outlined, color: Colors.red.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Catatan Revisi Legal",
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.existingMou!.catatanRevisi!,
+                      style: TextStyle(color: Colors.red.shade900, fontSize: 13, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            if (!isUpdate || widget.existingMou!.statusMou != 'Menunggu TTD') ...[
+              const Text(
+                "Informasi Mitra Agent",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _agentNameController,
+                decoration: InputDecoration(
+                  labelText: "Nama Agent",
+                  hintText: "Contoh: Ray White Menteng",
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Color(0xFF1F658A), width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _principalNameController,
+                decoration: InputDecoration(
+                  labelText: "Nama Principal",
+                  hintText: "Contoh: Budi Santoso",
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: Color(0xFF1F658A), width: 2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Logo Picker
+              const Text(
+                "Logo Mitra (Opsional)",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _pickLogoImage,
+                child: Container(
+                  height: 100,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  child: _pickedLogoFile != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: _pickedLogoFile!.bytes != null 
+                              ? Image.memory(_pickedLogoFile!.bytes!, fit: BoxFit.cover)
+                              : Image.file(io.File(_pickedLogoFile!.path!), fit: BoxFit.cover),
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_photo_alternate_outlined, color: Colors.grey.shade400, size: 32),
+                            const SizedBox(height: 8),
+                            Text("Pilih Logo", style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                          ],
+                        ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+            ],
 
             // Big Upload Area (Mockup 2)
             Container(
@@ -380,18 +578,27 @@ class _BrMouAgentUploadScreenState extends State<BrMouAgentUploadScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _submitForReview,
+                onPressed: _isLoading ? null : _submitForReview,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF1F658A),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
                   elevation: 0,
                 ),
-                child: const Text("Submit for Review", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Text(pageTitle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 60),
             Center(
               child: Text(
                 "Dengan menekan tombol di atas, Anda menyetujui syarat dan ketentuan penggunaan platform kami.",

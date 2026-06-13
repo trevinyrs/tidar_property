@@ -86,7 +86,6 @@ class RoleBottomNav extends StatelessWidget {
         BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Beranda'),
         BottomNavigationBarItem(icon: Icon(Icons.description_outlined), label: 'MOU'),
         BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), label: 'Stock'),
-        BottomNavigationBarItem(icon: Icon(Icons.analytics_outlined), label: 'Report'),
         BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profil'),
       ],
     );

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/services/mou_service.dart';
 import '../../../models/mou_model.dart';
+import '../../../widgets/custom_app_bar.dart';
 import 'br_mou_agent_upload_screen.dart';
 
 class MouTrackingDetailScreen extends StatelessWidget {
@@ -14,770 +17,423 @@ class MouTrackingDetailScreen extends StatelessWidget {
     required this.company,
   });
 
-  // Custom date formatter to avoid dependency on 'intl' package
-  String _formatDate(DateTime date) {
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
-    ];
-    return "${date.day} ${months[date.month - 1]} ${date.year}";
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final secondaryColor = theme.colorScheme.secondary;
-    const bgColor = Color(0xFFF5F6F8);
-    const cardWhite = Colors.white;
+    return StreamBuilder<List<MouDocument>>(
+      initialData: [mou],
+      stream: Provider.of<MouService>(context, listen: false).getMousStream(),
+      builder: (context, snapshot) {
+        final mous = snapshot.data ?? [];
+        final currentMou = mous.firstWhere((m) => m.idMou == mou.idMou, orElse: () => mou);
+        final status = currentMou.statusMou;
+        final currentAgentName = currentMou.idAgent ?? agentName;
+        final principalName = currentMou.namaPrincipal ?? "Belum diatur";
 
-    final status = mou.statusMou;
-    
-    bool isStep1Done = false;
-    bool isStep2Done = false;
-    bool isStep3Done = false;
-    bool isStep4Done = false;
-    bool isStep5Done = false;
+        // Logic for Dynamic Status
+        TimelineStatus drafStatus = TimelineStatus.pending;
+        TimelineStatus tinjauanStatus = TimelineStatus.pending;
+        TimelineStatus revisiStatus = TimelineStatus.pending;
+        TimelineStatus persetujuanStatus = TimelineStatus.pending;
+        TimelineStatus aktifStatus = TimelineStatus.pending;
 
-    bool isStep1Active = false;
-    bool isStep2Active = false;
-    bool isStep3Active = false;
-    bool isStep4Active = false;
-    bool isStep5Active = false;
+        if (status == 'Draf') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.active;
+        } else if (status == 'Menunggu TTD') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.completed;
+          persetujuanStatus = TimelineStatus.active;
+        } else if (status == 'Revisi') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.completed;
+          revisiStatus = TimelineStatus.active;
+        } else if (status == 'Aktif') {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.completed;
+          revisiStatus = TimelineStatus.completed;
+          persetujuanStatus = TimelineStatus.completed;
+          aktifStatus = TimelineStatus.completed;
+        } else {
+          drafStatus = TimelineStatus.completed;
+          tinjauanStatus = TimelineStatus.active;
+        }
 
-    if (status == 'Draf') {
-      isStep1Active = true;
-    } else if (status == 'Menunggu TTD') {
-      isStep1Done = true;
-      isStep2Active = true;
-    } else if (status == 'Revisi') {
-      isStep1Done = true;
-      isStep2Done = true;
-      isStep3Active = true;
-    } else if (status == 'Aktif') {
-      isStep1Done = true;
-      isStep2Done = true;
-      isStep3Done = true;
-      isStep4Done = true;
-      isStep5Done = true;
-    } else {
-      isStep1Done = true;
-      isStep2Active = true;
-    }
-
-    final formattedDate = _formatDate(mou.tanggalUpload);
-
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: cardWhite,
-        elevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black87, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        centerTitle: true,
-        title: Column(
-          children: [
-            const Text(
-              "Pelacakan MoU",
-              style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              mou.idMou.startsWith('mock') ? "#MOU-2026-08912" : "#${mou.idMou.toUpperCase().substring(0, mou.idMou.length.clamp(0, 10))}",
-              style: TextStyle(
-                color: Colors.grey.shade600,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── CONDITIONAL BANNER ──────────────────────────────────
-            if (status == 'Revisi') ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: primaryColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.25),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: const [
-                        Icon(Icons.warning_amber_rounded, color: Colors.white, size: 24),
-                        SizedBox(width: 10),
-                        Text(
-                          "Tindakan Diperlukan",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "Anda perlu meninjau revisi dari departemen legal sebelum melanjutkan ke tahap approval.",
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => BrMouAgentUploadScreen(
-                                agentName: agentName,
-                                company: company,
-                              ),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: primaryColor,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Tinjau Revisi Sekarang",
-                              style: TextStyle(
-                                color: primaryColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Icon(Icons.arrow_forward_rounded, color: primaryColor, size: 16),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-
-            // ── VERTICAL STATUS STEP TRACKER ────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                color: cardWhite,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "STATUS PELACAKAN",
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  _buildVerticalStep(
-                    context: context,
-                    title: "Draft",
-                    description: "MoU dibuat & diunggah oleh BR",
-                    date: isStep1Done ? formattedDate : null,
-                    isDone: isStep1Done,
-                    isActive: isStep1Active,
-                    isLast: false,
-                  ),
-                  _buildVerticalStep(
-                    context: context,
-                    title: "Review Legal",
-                    description: "Peninjauan draf oleh departemen hukum",
-                    date: isStep2Done ? formattedDate : null,
-                    isDone: isStep2Done,
-                    isActive: isStep2Active,
-                    isLast: false,
-                  ),
-                  _buildVerticalStep(
-                    context: context,
-                    title: "Revisi",
-                    description: "Perbaikan klausul atau berkas",
-                    date: isStep3Done ? formattedDate : null,
-                    isDone: isStep3Done,
-                    isActive: isStep3Active,
-                    isLast: false,
-                  ),
-                  _buildVerticalStep(
-                    context: context,
-                    title: "Approval",
-                    description: "Persetujuan akhir oleh manajemen",
-                    date: isStep4Done ? formattedDate : null,
-                    isDone: isStep4Done,
-                    isActive: isStep4Active,
-                    isLast: false,
-                  ),
-                  _buildVerticalStep(
-                    context: context,
-                    title: "Aktif",
-                    description: "MoU resmi berlaku dalam sistem",
-                    date: isStep5Done ? formattedDate : null,
-                    isDone: isStep5Done,
-                    isActive: isStep5Active,
-                    isLast: true,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── GRID DURASI & PRIORITAS ─────────────────────────────
-            Row(
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8F9FA),
+          appBar: const CustomAppBar(
+            titleText: "",
+            backgroundColor: Colors.transparent,
+          ),
+          extendBodyBehindAppBar: true,
+          body: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
-                    decoration: BoxDecoration(
-                      color: cardWhite,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                const SizedBox(height: kToolbarHeight + 40),
+                // Header Info
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        currentMou.idMou.startsWith('temp_') || currentMou.idMou.startsWith('mock') ? "ID KASUS: #TDR-88312" : "ID KASUS: #${currentMou.idMou.toUpperCase().substring(0, currentMou.idMou.length.clamp(0, 10))}",
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "DURASI PROSES",
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade500,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Kemitraan Agent\n$currentAgentName",
+                        style: const TextStyle(
+                          fontSize: 32,
+                          height: 1.1,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Principal: $principalName",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1F658A),
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          "4 Hari",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1C2B36),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Status Saat Ini: $status",
+                            style: const TextStyle(
+                              color: Color(0xFF1F658A),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
-                    decoration: BoxDecoration(
-                      color: cardWhite,
-                      borderRadius: BorderRadius.circular(18),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "PRIORITAS",
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade500,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                const SizedBox(height: 24),
+
+                // ── CONDITIONAL BANNER ──────────────────────────────────
+                if (status == 'Revisi' || status == 'Menunggu TTD')
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: status == 'Revisi' ? const Color(0xFF1F658A) : Colors.orange.shade600,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (status == 'Revisi' ? const Color(0xFF1F658A) : Colors.orange).withValues(alpha: 0.3),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          "Tinggi",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFE74C3C),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(status == 'Revisi' ? Icons.warning_amber_rounded : Icons.edit_document, color: Colors.white, size: 24),
+                              const SizedBox(width: 10),
+                              Text(
+                                status == 'Revisi' ? "Tindakan Diperlukan" : "Menunggu TTD Basah",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 12),
+                          Text(
+                            status == 'Revisi'
+                                ? "Anda perlu meninjau revisi dari departemen legal."
+                                : "MoU telah disetujui. Silakan unggah dokumen dengan Tanda Tangan Basah.",
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => BrMouAgentUploadScreen(
+                                      agentName: agentName,
+                                      company: company,
+                                      existingMou: currentMou,
+                                    ),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: status == 'Revisi' ? const Color(0xFF1F658A) : Colors.orange.shade700,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    status == 'Revisi' ? "Tinjau Revisi Sekarang" : "Unggah TTD Basah",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Icon(status == 'Revisi' ? Icons.arrow_forward_rounded : Icons.upload_file, size: 16),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+
+                // Timeline Card
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.02),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Siklus Hidup Perjanjian",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Color(0xFF1E293B),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      _buildTimelineStep(
+                        title: "Draf",
+                        date: "12 Okt 2023",
+                        description: "Lingkup perjanjian awal dan ketentuan ditetapkan oleh pimpinan proyek.",
+                        status: drafStatus,
+                        icon: Icons.check,
+                      ),
+                      _buildTimelineStep(
+                        title: "Menunggu Tinjauan Tim Legal",
+                        description: "Tim legal sedang melakukan peninjauan draf",
+                        status: tinjauanStatus,
+                        icon: Icons.gavel,
+                      ),
+                      _buildTimelineStep(
+                        title: "Revisi",
+                        description: "Implementasi umpan balik hukum dan penawaran balik mitra.",
+                        status: revisiStatus,
+                        icon: Icons.history,
+                      ),
+                      _buildTimelineStep(
+                        title: "Persetujuan",
+                        description: "Persetujuan akhir dari manajemen dan Principal.",
+                        status: persetujuanStatus,
+                        icon: Icons.assignment_turned_in_outlined,
+                      ),
+                      _buildTimelineStep(
+                        title: "Aktif",
+                        description: "MoU resmi berlaku dan kemitraan dimulai.",
+                        status: aktifStatus,
+                        icon: Icons.rocket_launch_outlined,
+                        isLast: true,
+                      ),
+                    ],
+                  ),
                 ),
+
+                const SizedBox(height: 40),
               ],
             ),
-
-            const SizedBox(height: 24),
-
-            // ── LAMPIRAN DOKUMEN ────────────────────────────────────
-            Text(
-              "LAMPIRAN DOKUMEN",
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: primaryColor.withValues(alpha: 0.6),
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardWhite,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.picture_as_pdf, color: Colors.red, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mou.fileName.isNotEmpty ? mou.fileName : "MoU_Kemitraan_Agent.pdf",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1C2B36),
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          mou.fileSize.isNotEmpty ? mou.fileSize : "2.4 MB",
-                          style: TextStyle(
-                            color: Colors.grey.shade500,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: Icon(Icons.download_for_offline, color: primaryColor, size: 28),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── LOG AKTIVITAS ───────────────────────────────────────
-            const Text(
-              "LOG AKTIVITAS",
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: cardWhite,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  _buildLogItem(
-                    context: context,
-                    title: "Revisi diajukan oleh Legal",
-                    description: mou.catatanRevisi ?? "Mohon perhatikan pasal 4 ayat 2 mengenai terminasi dini.",
-                    time: "Hari ini, 14:20",
-                    isFirst: true,
-                    isLast: false,
-                  ),
-                  _buildLogItem(
-                    context: context,
-                    title: "Review Dokumen",
-                    description: "Dokumen dalam peninjauan Legal",
-                    time: "Kemarin, 09:15",
-                    isFirst: false,
-                    isLast: false,
-                  ),
-                  _buildLogItem(
-                    context: context,
-                    title: "Draf Diunggah",
-                    description: "MoU berhasil diunggah oleh BR",
-                    time: "10 Jun 2026, 11:00",
-                    isFirst: false,
-                    isLast: true,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── CARD AGEN PENGELOLA ─────────────────────────────────
-            const Text(
-              "AGEN PENGELOLA",
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: cardWhite,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: primaryColor.withValues(alpha: 0.1),
-                        child: Text(
-                          agentName.isNotEmpty ? agentName[0] : "A",
-                          style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 18),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              agentName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1C2B36),
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              "Senior Property Agent",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Row(
-                              children: List.generate(5, (index) {
-                                return const Icon(Icons.star, color: Colors.amber, size: 14);
-                              }),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 44,
-                          child: ElevatedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.message_rounded, size: 16),
-                            label: const Text("Hubungi Agen", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: primaryColor,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: SizedBox(
-                          height: 44,
-                          child: OutlinedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.phone_rounded, size: 16),
-                            label: const Text("Telepon Langsung", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: secondaryColor,
-                              side: BorderSide(color: secondaryColor.withValues(alpha: 0.4)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildVerticalStep({
-    required BuildContext context,
+  Widget _buildTimelineStep({
     required String title,
     required String description,
-    required String? date,
-    required bool isDone,
-    required bool isActive,
-    required bool isLast,
+    required TimelineStatus status,
+    required IconData icon,
+    String? date,
+    String? badgeText,
+    Widget? subtitleWidget,
+    bool isLast = false,
   }) {
-    final theme = Theme.of(context);
-    final primaryColor = theme.colorScheme.primary;
-    final secondaryColor = theme.colorScheme.secondary;
+    Color iconBgColor;
+    Color iconColor;
+    Color titleColor;
+    bool showLine = !isLast;
 
-    Color markerColor = Colors.grey.shade300;
-    Widget markerChild = const SizedBox.shrink();
-
-    if (isDone) {
-      markerColor = primaryColor;
-      markerChild = const Icon(Icons.check, color: Colors.white, size: 14);
-    } else if (isActive) {
-      markerColor = secondaryColor;
-      markerChild = Container(
-        width: 8,
-        height: 8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-        ),
-      );
+    switch (status) {
+      case TimelineStatus.completed:
+        iconBgColor = const Color(0xFF1F658A);
+        iconColor = Colors.white;
+        titleColor = const Color(0xFF1E293B);
+        break;
+      case TimelineStatus.active:
+        iconBgColor = const Color(0xFFE3F2FD);
+        iconColor = const Color(0xFF1F658A);
+        titleColor = const Color(0xFF1F658A);
+        break;
+      case TimelineStatus.pending:
+      default:
+        iconBgColor = const Color(0xFFF1F5F9);
+        iconColor = Colors.grey.shade400;
+        titleColor = Colors.grey.shade500;
+        break;
     }
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Timeline indicator & line
           Column(
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: 24,
-                height: 24,
+              Container(
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: markerColor,
+                  color: iconBgColor,
                   shape: BoxShape.circle,
+                  border: status == TimelineStatus.active
+                      ? Border.all(color: const Color(0xFF1F658A).withValues(alpha: 0.5), width: 2)
+                      : null,
                 ),
-                child: Center(child: markerChild),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 18,
+                ),
               ),
-              if (!isLast)
+              if (showLine)
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: isDone ? primaryColor : Colors.grey.shade300,
+                    color: status == TimelineStatus.completed
+                        ? const Color(0xFF1F658A)
+                        : Colors.grey.shade200,
                   ),
                 ),
             ],
           ),
           const SizedBox(width: 16),
+          // Content
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: isActive
-                        ? secondaryColor
-                        : (isDone ? const Color(0xFF1C2B36) : Colors.grey.shade500),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: titleColor,
+                          ),
+                        ),
+                      ),
+                      if (date != null)
+                        Text(
+                          date,
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      if (badgeText != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF96D3FD).withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            badgeText,
+                            style: const TextStyle(
+                              color: Color(0xFF1F658A),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                    height: 1.3,
-                  ),
-                ),
-                if (date != null) ...[
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
-                    date,
+                    description,
                     style: TextStyle(
-                      fontSize: 10,
-                      color: primaryColor,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      color: status == TimelineStatus.pending ? Colors.grey.shade400 : Colors.grey.shade600,
+                      height: 1.4,
                     ),
                   ),
+                  if (subtitleWidget != null) subtitleWidget,
                 ],
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLogItem({
-    required BuildContext context,
-    required String title,
-    required String description,
-    required String time,
-    required bool isFirst,
-    required bool isLast,
-  }) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              Container(
-                width: 10,
-                height: 10,
-                margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isFirst ? primaryColor : Colors.grey.shade400,
-                  shape: BoxShape.circle,
-                ),
               ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 1,
-                    color: Colors.grey.shade300,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isFirst ? const Color(0xFF1C2B36) : Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade500,
-                    fontStyle: isFirst ? FontStyle.italic : FontStyle.normal,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+enum TimelineStatus {
+  completed,
+  active,
+  pending,
 }
