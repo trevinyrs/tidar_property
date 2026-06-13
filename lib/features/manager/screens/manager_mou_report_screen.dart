@@ -345,7 +345,7 @@ class ManagerMouReportScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-                          )
+                          ),
                           );
                         },
                       ),

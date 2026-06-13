@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import '../../../widgets/custom_app_bar.dart';
@@ -245,14 +250,6 @@ class _ManagerSalesScreenState extends State<ManagerSalesScreen> {
                         "Performa Penjualan",
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                       ),
-                      TextButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.picture_as_pdf, size: 16),
-                        label: const Text("Ekspor PDF", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                        style: TextButton.styleFrom(
-                          foregroundColor: primaryColor,
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -302,17 +299,34 @@ class _ManagerSalesScreenState extends State<ManagerSalesScreen> {
                         "Closing Terakhir",
                         style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                       ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ManagerSalesListScreen()),
-                          );
-                        },
-                        child: Text(
-                          "Lihat Semua",
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryColor),
-                        ),
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => _exportToExcel(context, salesDocs),
+                            icon: const Icon(Icons.download_rounded, color: Color(0xFF1F658A), size: 22),
+                            tooltip: "Export Laporan Penjualan (.xlsx)",
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const ManagerSalesListScreen()),
+                              );
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              "Lihat Semua",
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: primaryColor),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -451,5 +465,104 @@ class _ManagerSalesScreenState extends State<ManagerSalesScreen> {
       ),
       ),
     );
+  }
+
+  Future<void> _exportToExcel(BuildContext context, List<QueryDocumentSnapshot> docs) async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+
+      var excel = Excel.createExcel();
+      Sheet sheet = excel['Riwayat Penjualan'];
+      excel.delete('Sheet1');
+
+      final headerStyle = CellStyle(
+        backgroundColorHex: ExcelColor.blue,
+        fontColorHex: ExcelColor.white,
+        bold: true,
+        horizontalAlign: HorizontalAlign.Center,
+      );
+
+      sheet.appendRow([
+        TextCellValue("No"),
+        TextCellValue("Nama Properti"),
+        TextCellValue("Kode Unit"),
+        TextCellValue("Harga Deal (Rp)"),
+        TextCellValue("Nama Agen Penjual"),
+        TextCellValue("Tanggal & Waktu Transaksi"),
+        TextCellValue("Status"),
+      ]);
+
+      for (int i = 0; i < 7; i++) {
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0)).cellStyle = headerStyle;
+      }
+
+      int rowIndex = 1;
+      for (var doc in docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final title = data['properti_title'] ?? data['title'] ?? 'Aset Tidar';
+        final unit = data['kode_unit'] ?? data['unit'] ?? 'Unit';
+        final agent = data['nama_agen'] ?? data['agent'] ?? 'Agen Tidar';
+        final harga = (data['harga'] ?? data['price'] ?? 0).toDouble();
+        
+        DateTime? date;
+        if (data['created_at'] != null) {
+          if (data['created_at'] is Timestamp) {
+            date = (data['created_at'] as Timestamp).toDate();
+          } else if (data['created_at'] is String) {
+            date = DateTime.tryParse(data['created_at']);
+          }
+        }
+        date ??= DateTime.now();
+
+        sheet.appendRow([
+          IntCellValue(rowIndex),
+          TextCellValue(title.toString()),
+          TextCellValue(unit.toString()),
+          DoubleCellValue(harga),
+          TextCellValue(agent.toString()),
+          TextCellValue(DateFormat('dd MMM yyyy, HH:mm').format(date)),
+          TextCellValue("Lunas / Success"),
+        ]);
+        
+        // Status formatting
+        final statusCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: rowIndex));
+        statusCell.cellStyle = CellStyle(fontColorHex: ExcelColor.green, bold: true);
+        
+        // Currency formatting
+        final priceCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: rowIndex));
+        priceCell.cellStyle = CellStyle(numberFormat: NumFormat.standard_4);
+
+        rowIndex++;
+      }
+
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/Laporan_Penjualan_Tidar.xlsx';
+      final fileBytes = excel.encode();
+      
+      if (fileBytes != null) {
+        File(path)
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(fileBytes);
+          
+        if (context.mounted) {
+          Navigator.pop(context); // close dialog
+          await Share.shareXFiles(
+            [XFile(path)],
+            text: 'Berikut adalah laporan riwayat penjualan terbaru.',
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Gagal meng-export data: $e")),
+        );
+      }
+    }
   }
 }
