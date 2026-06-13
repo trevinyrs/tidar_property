@@ -50,19 +50,32 @@ class ManagerPropertyDetailScreen extends StatelessWidget {
                       bottomLeft: Radius.circular(32),
                       bottomRight: Radius.circular(32),
                     ),
-                    child: Image.network(
-                      property.imageUrls.isNotEmpty
-                          ? property.imageUrls.first
-                          : "https://picsum.photos/800/500",
+                    child: SizedBox(
                       height: 340,
                       width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        height: 340,
-                        width: double.infinity,
-                        color: const Color(0xFFEDF1F4),
-                        child: const Icon(Icons.broken_image_outlined, size: 64, color: Colors.grey),
-                      ),
+                      child: property.imageUrls.isNotEmpty
+                          ? PageView.builder(
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: property.imageUrls.length,
+                              itemBuilder: (context, index) {
+                                return Image.network(
+                                  property.imageUrls[index],
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: const Color(0xFFEDF1F4),
+                                    child: const Icon(Icons.broken_image_outlined, size: 64, color: Colors.grey),
+                                  ),
+                                );
+                              },
+                            )
+                          : Image.network(
+                              "https://picsum.photos/800/500",
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: const Color(0xFFEDF1F4),
+                                child: const Icon(Icons.broken_image_outlined, size: 64, color: Colors.grey),
+                              ),
+                            ),
                     ),
                   ),
                 ),

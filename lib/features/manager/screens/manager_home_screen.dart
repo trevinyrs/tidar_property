@@ -177,9 +177,9 @@ class MultiStreamBuilder extends StatelessWidget {
                   final data = doc.data() as Map<String, dynamic>? ?? {};
                   realTotalSales += (data['harga'] ?? data['price'] ?? 0).toDouble();
                 }
-                const double baseSales = 42800000000; // Rp 42.8 Milyar base
-                final double finalSales = baseSales + realTotalSales;
-                final String totalSalesText = "Rp ${(finalSales / 1000000000).toStringAsFixed(1)}M";
+                final String totalSalesText = realTotalSales > 0
+                    ? "Rp ${(realTotalSales / 1000000000).toStringAsFixed(1)}M"
+                    : "Rp 42.8M";
 
                 return SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),

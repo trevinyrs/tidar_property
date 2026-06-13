@@ -38,6 +38,7 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<UserProvider>(context).currentUser;
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FB),
       appBar: CustomAppBar(
@@ -57,17 +58,32 @@ class _PropertyListScreenState extends State<PropertyListScreen> {
                   });
                 },
               )
-            : Image.asset(
-                "assets/images/logo_tidar.png",
-                height: 38,
-                errorBuilder: (context, error, stackTrace) => const Text(
-                  "TIMPRO",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1F658A),
+            : Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFEDF1F4),
+                    backgroundImage: (user?.fotoProfil != null && user!.fotoProfil!.isNotEmpty)
+                        ? NetworkImage(user!.fotoProfil!)
+                        : null,
+                    child: (user?.fotoProfil == null || user!.fotoProfil!.isEmpty)
+                        ? const Icon(Icons.person, size: 20, color: Colors.grey)
+                        : null,
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Image.asset(
+                    "assets/images/logo_tidar.png",
+                    height: 38,
+                    errorBuilder: (context, error, stackTrace) => const Text(
+                      "TIMPRO",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1F658A),
+                      ),
+                    ),
+                  ),
+                ],
               ),
         actions: [
           IconButton(

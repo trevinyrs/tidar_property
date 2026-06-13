@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:tidar_property/features/br/screens/br_mou_screen.dart';
 import 'package:tidar_property/models/user_model.dart';
@@ -127,62 +128,7 @@ class BrDashboardContent extends StatelessWidget {
           // 1. TOTAL PENJUALAN
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "TOTAL PENJUALAN",
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        "Rp 4.28B",
-                        style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF1F658A)),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.trending_up, size: 16, color: Colors.teal),
-                          const SizedBox(width: 4),
-                          Text(
-                            "+12.5% dari bulan lalu",
-                            style: TextStyle(color: Colors.teal.shade700, fontSize: 12, fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF96D3FD).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_outlined,
-                      color: Color(0xFF1F658A),
-                      size: 28,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _buildTotalPenjualanStream(context),
           ),
 
           // 2. TOTAL AGENT
@@ -368,7 +314,7 @@ class BrDashboardContent extends StatelessWidget {
       stream: mouService.getMousByTypeStream('Agent'),
       builder: (context, snapshot) {
         final mous = snapshot.data ?? [];
-        final count = mous.where((m) => m.statusMou.toUpperCase() == 'AKTIF').length;
+        final count = mous.where((m) => m.statusMou.toLowerCase() == 'aktif').length;
 
         return Text(
           count > 0 ? "$count" : "0",
@@ -385,7 +331,7 @@ class BrDashboardContent extends StatelessWidget {
       stream: propertyService.getProperties(),
       builder: (context, snapshot) {
         final properties = snapshot.data ?? [];
-        final count = properties.where((p) => p.status.toUpperCase() == 'AVAILABLE').length;
+        final count = properties.length;
 
         return Container(
           width: double.infinity,
@@ -437,6 +383,82 @@ class BrDashboardContent extends StatelessWidget {
               const Text(
                 "Listing Aktif",
                 style: TextStyle(color: Colors.white70, fontSize: 13),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Widget untuk menghitung Total Penjualan secara dinamis
+  Widget _buildTotalPenjualanStream(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('tb_penjualan').snapshots(),
+      builder: (context, snapshot) {
+        double realTotalSales = 0;
+        if (snapshot.hasData) {
+          for (var doc in snapshot.data!.docs) {
+            final data = doc.data() as Map<String, dynamic>? ?? {};
+            realTotalSales += (data['harga'] ?? data['price'] ?? 0).toDouble();
+          }
+        }
+        final String totalSalesText = realTotalSales > 0
+            ? "Rp ${(realTotalSales / 1000000000).toStringAsFixed(1)}M"
+            : "Rp 42.8M";
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 15,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "TOTAL PENJUALAN",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 0.5),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    totalSalesText,
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF1F658A)),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.trending_up, size: 16, color: Colors.teal),
+                      const SizedBox(width: 4),
+                      Text(
+                        "+12.5% dari bulan lalu",
+                        style: TextStyle(color: Colors.teal.shade700, fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF96D3FD).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Color(0xFF1F658A),
+                  size: 28,
+                ),
               ),
             ],
           ),
